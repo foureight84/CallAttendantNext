@@ -184,7 +184,7 @@ export default function DashboardPage() {
               <Table.Th>Time</Table.Th>
               <Table.Th>Name</Table.Th>
               <Table.Th>Number</Table.Th>
-              <Table.Th>Action</Table.Th>
+              <Table.Th visibleFrom="sm">Action</Table.Th>
               <Table.Th></Table.Th>
             </Table.Tr>
           </Table.Thead>
@@ -197,7 +197,7 @@ export default function DashboardPage() {
                   <Table.Td>{call.time}</Table.Td>
                   <Table.Td>{resolveCallerName(call.number, call.name, whitelist, blacklist)}</Table.Td>
                   <Table.Td>{call.number ?? '—'}</Table.Td>
-                  <Table.Td><ActionBadge action={call.action} /></Table.Td>
+                  <Table.Td visibleFrom="sm"><ActionBadge action={call.action} /></Table.Td>
                   <Table.Td>
                     {voicemail && (
                       <UnstyledButton onClick={() => setVoicemailModal({ message: voicemail, call })}>
