@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Table, Badge, Title, Stack, TextInput, Group, Pagination, Text, Button, Select, Card, UnstyledButton } from '@mantine/core';
+import { Table, Badge, Title, Stack, TextInput, Group, Pagination, Text, Button, Select, Card, UnstyledButton, Menu, ActionIcon, Box } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
-import { IconRecordMail } from '@tabler/icons-react';
+import { IconRecordMail, IconDots, IconAddressBook, IconBan } from '@tabler/icons-react';
 import { AddToListModal } from '@/components/AddToListModal';
 import { VoicemailModal } from '@/components/VoicemailModal';
 import { apiClient } from '@/lib/api-client';
@@ -144,8 +144,8 @@ export default function CallsPage() {
             <Table.Th>Time</Table.Th>
             <Table.Th>Name</Table.Th>
             <Table.Th>Number</Table.Th>
-            <Table.Th>Action</Table.Th>
-            <Table.Th>Reason</Table.Th>
+            <Table.Th visibleFrom="sm">Action</Table.Th>
+            <Table.Th visibleFrom="sm">Reason</Table.Th>
             <Table.Th></Table.Th>
             <Table.Th></Table.Th>
           </Table.Tr>
@@ -162,8 +162,8 @@ export default function CallsPage() {
                 <Table.Td>{call.time ?? '—'}</Table.Td>
                 <Table.Td>{displayName}</Table.Td>
                 <Table.Td>{call.number ?? '—'}</Table.Td>
-                <Table.Td><ActionBadge action={call.action} /></Table.Td>
-                <Table.Td style={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <Table.Td visibleFrom="sm"><ActionBadge action={call.action} /></Table.Td>
+                <Table.Td visibleFrom="sm" style={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {call.reason ?? '—'}
                 </Table.Td>
                 <Table.Td>
@@ -181,14 +181,35 @@ export default function CallsPage() {
                 </Table.Td>
                 <Table.Td>
                   {call.number && !inList && (
-                    <Group gap={6} wrap="nowrap">
-                      <Button size="xs" variant="light" color="green" onClick={() => setModal({ list: 'whitelist', call })}>
-                        Add to Phonebook
-                      </Button>
-                      <Button size="xs" variant="light" color="red" onClick={() => setModal({ list: 'blacklist', call })}>
-                        Block
-                      </Button>
-                    </Group>
+                    <>
+                      <Box visibleFrom="sm">
+                        <Group gap={6} wrap="nowrap">
+                          <Button size="xs" variant="light" color="green" onClick={() => setModal({ list: 'whitelist', call })}>
+                            Add to Phonebook
+                          </Button>
+                          <Button size="xs" variant="light" color="red" onClick={() => setModal({ list: 'blacklist', call })}>
+                            Block
+                          </Button>
+                        </Group>
+                      </Box>
+                      <Box hiddenFrom="sm">
+                        <Menu position="bottom-end" withinPortal>
+                          <Menu.Target>
+                            <ActionIcon variant="subtle" size="sm">
+                              <IconDots size={16} />
+                            </ActionIcon>
+                          </Menu.Target>
+                          <Menu.Dropdown>
+                            <Menu.Item leftSection={<IconAddressBook size={14} />} color="green" onClick={() => setModal({ list: 'whitelist', call })}>
+                              Add to Phonebook
+                            </Menu.Item>
+                            <Menu.Item leftSection={<IconBan size={14} />} color="red" onClick={() => setModal({ list: 'blacklist', call })}>
+                              Block
+                            </Menu.Item>
+                          </Menu.Dropdown>
+                        </Menu>
+                      </Box>
+                    </>
                   )}
                 </Table.Td>
               </Table.Tr>
