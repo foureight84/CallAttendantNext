@@ -17,7 +17,6 @@ If you have a hardware modem not on this list and would like support added, open
 ## Stack
 
 - **Next.js 15** — frontend and API routes
-- **React 19** — settings, call log, whitelist/blacklist, voicemail UI
 - **ts-rest + zod** — type-safe REST API contract
 - **SQLite** via drizzle-orm + libsql
 - **serialport** — serial communication with USB modem
