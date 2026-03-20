@@ -1,0 +1,30 @@
+services:
+  callattendant:
+    build: .
+    ports:
+      - "3000:3000"
+    devices:
+      - "/dev/ttyUSB0:/dev/ttyUSB0"
+    volumes:
+      - ./messages:/app/messages
+      - ./callattendant.db:/app/callattendant.db
+      - ./piper-models:/app/piper-models
+    environment:
+      - SERIAL_PORT=/dev/ttyUSB0
+      - SERIAL_BAUD_RATE=57600
+      - DB_PATH=/app/callattendant.db
+      - MESSAGES_DIR=/app/messages
+      - SCREENING_MODE=whitelist,blacklist
+      - BLOCK_SERVICE=NOMOROBO
+      - SPAM_THRESHOLD=2
+      - RINGS_BEFORE_VM=4
+      - RINGS_BEFORE_VM_SCREENED=2
+      - BLOCKLIST_ACTION=2
+      - RINGS_BEFORE_VM_BLOCKLIST=0
+      - PIPER_BINARY=piper
+      - PIPER_MODELS_DIR=/app/piper-models
+      - PIPER_LENGTH_SCALE=1.0
+      - ENABLE_GPIO=false
+      - DEBUG_CONSOLE=false
+      - NODE_ENV=production
+    restart: unless-stopped

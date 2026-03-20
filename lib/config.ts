@@ -1,0 +1,20 @@
+
+export const config = {
+  serialPort: process.env.SERIAL_PORT ?? '/dev/ttyUSB0',
+  serialBaudRate: parseInt(process.env.SERIAL_BAUD_RATE ?? '57600', 10),
+  dbPath: process.env.DB_PATH ?? './callattendant.db',
+  messagesDir: process.env.MESSAGES_DIR ?? './messages',
+  screeningMode: (process.env.SCREENING_MODE ?? 'whitelist,blacklist').split(',').map(s => s.trim()),
+  blockService: process.env.BLOCK_SERVICE ?? 'NOMOROBO',
+  spamThreshold: parseInt(process.env.SPAM_THRESHOLD ?? '2', 10),
+  ringsBeforeVm: parseInt(process.env.RINGS_BEFORE_VM ?? '4', 10),
+  ringsBeforeVmScreened:  parseInt(process.env.RINGS_BEFORE_VM_SCREENED  ?? '2', 10),
+  blocklistAction:        parseInt(process.env.BLOCKLIST_ACTION           ?? '2', 10),
+  ringsBeforeVmBlocklist: parseInt(process.env.RINGS_BEFORE_VM_BLOCKLIST  ?? '0', 10),
+  enableGpio: process.env.ENABLE_GPIO === 'true',
+  debugConsole: process.env.DEBUG_CONSOLE === 'true',
+  port: parseInt(process.env.PORT ?? '3000', 10),
+  piperBinary:      process.env.PIPER_BINARY       ?? 'piper',
+  piperModelsDir:   process.env.PIPER_MODELS_DIR   ?? './piper-models',
+  piperLengthScale: parseFloat(process.env.PIPER_LENGTH_SCALE ?? '1.0'),
+} as const;

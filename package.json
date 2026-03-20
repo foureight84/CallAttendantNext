@@ -1,0 +1,41 @@
+{
+  "name": "callattendantnext",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "NODE_ENV=production tsx --env-file=.env server.ts",
+    "server": "tsx --env-file=.env server.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "drizzle-kit": "^0.31.10",
+    "postcss-preset-mantine": "^1.18.0",
+    "postcss-simple-vars": "^7.0.1",
+    "tsx": "^4.19.0",
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.17.0",
+    "@mantine/charts": "^8.3.18",
+    "@mantine/core": "^8.3.18",
+    "@mantine/form": "^8.3.18",
+    "@mantine/hooks": "^8.3.18",
+    "@mantine/notifications": "^8.3.18",
+    "@tabler/icons-react": "^3.40.0",
+    "@ts-rest/core": "^3.52.1",
+    "@ts-rest/next": "^3.52.1",
+    "cheerio": "^1.2.0",
+    "drizzle-orm": "^0.45.1",
+    "next": "^16.2.0",
+    "postcss": "^8.5.8",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "recharts": "^3.8.0",
+    "serialport": "^13.0.0",
+    "zod": "^4.3.6"
+  }
+}

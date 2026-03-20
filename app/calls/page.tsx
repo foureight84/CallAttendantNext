@@ -1,0 +1,228 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { Table, Badge, Title, Stack, TextInput, Group, Pagination, Text, Button, Select, Card, UnstyledButton } from '@mantine/core';
+import { useDebouncedValue } from '@mantine/hooks';
+import { IconRecordMail } from '@tabler/icons-react';
+import { AddToListModal } from '@/components/AddToListModal';
+import { VoicemailModal } from '@/components/VoicemailModal';
+import { apiClient } from '@/lib/api-client';
+import type { CallLog, ListEntry, Message } from '@/lib/contract';
+
+function ActionBadge({ action }: { action: string | null }) {
+  const colorMap: Record<string, string> = { Permitted: 'green', Blocked: 'red', Screened: 'yellow' };
+  return <Badge color={colorMap[action ?? ''] ?? 'gray'}>{action ?? 'Unknown'}</Badge>;
+}
+
+function resolveCallerName(
+  number: string | null,
+  callerIdName: string | null,
+  whitelist: Map<string, string | null>,
+  blacklist: Map<string, string | null>,
+): string {
+  if (number) {
+    if (whitelist.has(number)) return whitelist.get(number) || callerIdName || 'Unknown';
+    if (blacklist.has(number)) return blacklist.get(number) || callerIdName || 'Unknown';
+  }
+  const name = callerIdName ?? '—';
+  return name.toUpperCase() === 'O' ? 'UNKNOWN' : name;
+}
+
+const PAGE_SIZE_OPTIONS = ['50', '100'];
+
+export default function CallsPage() {
+  const [rows, setRows] = useState<CallLog[]>([]);
+  const [total, setTotal] = useState(0);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch] = useDebouncedValue(search, 300);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [whitelist, setWhitelist] = useState<Map<string, string | null>>(new Map());
+  const [blacklist, setBlacklist] = useState<Map<string, string | null>>(new Map());
+  const [modal, setModal] = useState<{ list: 'whitelist' | 'blacklist'; call: CallLog } | null>(null);
+  const [voicemailMap, setVoicemailMap] = useState<Map<number, Message>>(new Map());
+  const [voicemailModal, setVoicemailModal] = useState<{ message: Message; call: CallLog } | null>(null);
+
+  const loadLists = useCallback(() => {
+    Promise.all([
+      apiClient.whitelist.list(),
+      apiClient.blacklist.list(),
+    ]).then(([wl, bl]) => {
+      setWhitelist(new Map(wl.map((e: ListEntry) => [e.phoneNo, e.name])));
+      setBlacklist(new Map(bl.map((e: ListEntry) => [e.phoneNo, e.name])));
+    });
+  }, []);
+
+  useEffect(() => {
+    loadLists();
+    apiClient.messages.list({ limit: 200 }).then(d => {
+      setVoicemailMap(new Map(
+        d.messages
+          .filter((m): m is Message & { callLogId: number } => m.callLogId !== null)
+          .map(m => [m.callLogId, m])
+      ));
+    }).catch(() => {});
+  }, [loadLists]);
+
+  useEffect(() => {
+    apiClient.calls.list({
+      limit: pageSize,
+      offset: (page - 1) * pageSize,
+      search: debouncedSearch || undefined,
+      startDate: startDate || undefined,
+      endDate: endDate || undefined,
+    }).then(data => {
+      setRows(data.rows);
+      setTotal(data.total);
+    });
+  }, [page, pageSize, debouncedSearch, startDate, endDate]);
+
+  const handleVoicemailDelete = (messageId: number) => {
+    setVoicemailMap(prev => {
+      const next = new Map(prev);
+      for (const [callLogId, msg] of next) {
+        if (msg.messageId === messageId) { next.delete(callLogId); break; }
+      }
+      return next;
+    });
+  };
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  return (
+    <Stack gap="lg">
+      <Title order={2}>Call Log</Title>
+      <Card shadow="sm" padding="md" radius="md" withBorder>
+        <Group gap="sm" align="flex-end" wrap="wrap">
+          <TextInput
+            label="Search"
+            placeholder="Name or number..."
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            style={{ flex: 1, minWidth: 160 }}
+          />
+          <TextInput
+            label="From date"
+            type="date"
+            value={startDate}
+            onChange={e => { setStartDate(e.currentTarget.value); setPage(1); }}
+          />
+          <TextInput
+            label="To date"
+            type="date"
+            value={endDate}
+            onChange={e => { setEndDate(e.currentTarget.value); setPage(1); }}
+          />
+          <Button variant="subtle" onClick={() => { setStartDate(''); setEndDate(''); setPage(1); }}>
+            Clear dates
+          </Button>
+        </Group>
+      </Card>
+
+      <Group justify="space-between" align="center">
+        <Text c="dimmed" size="sm">{total} calls</Text>
+        <Group gap="xs" align="center">
+          <Text size="sm" c="dimmed">Per page:</Text>
+          <Select
+            data={PAGE_SIZE_OPTIONS}
+            value={String(pageSize)}
+            onChange={v => { setPageSize(Number(v)); setPage(1); }}
+            w={80}
+            size="xs"
+          />
+        </Group>
+      </Group>
+
+      <Table striped highlightOnHover>
+        <Table.Thead>
+          <Table.Tr>
+            <Table.Th>ID</Table.Th>
+            <Table.Th>Date</Table.Th>
+            <Table.Th>Time</Table.Th>
+            <Table.Th>Name</Table.Th>
+            <Table.Th>Number</Table.Th>
+            <Table.Th>Action</Table.Th>
+            <Table.Th>Reason</Table.Th>
+            <Table.Th></Table.Th>
+            <Table.Th></Table.Th>
+          </Table.Tr>
+        </Table.Thead>
+        <Table.Tbody>
+          {rows.map((call) => {
+            const inList = !!call.number && (whitelist.has(call.number) || blacklist.has(call.number));
+            const displayName = resolveCallerName(call.number, call.name, whitelist, blacklist);
+            const voicemail = voicemailMap.get(call.callLogId);
+            return (
+              <Table.Tr key={call.callLogId}>
+                <Table.Td>{call.callLogId}</Table.Td>
+                <Table.Td>{call.date ?? '—'}</Table.Td>
+                <Table.Td>{call.time ?? '—'}</Table.Td>
+                <Table.Td>{displayName}</Table.Td>
+                <Table.Td>{call.number ?? '—'}</Table.Td>
+                <Table.Td><ActionBadge action={call.action} /></Table.Td>
+                <Table.Td style={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {call.reason ?? '—'}
+                </Table.Td>
+                <Table.Td>
+                  {voicemail && (
+                    <UnstyledButton onClick={() => setVoicemailModal({ message: voicemail, call })}>
+                      <IconRecordMail
+                        size={26}
+                        stroke={1.5}
+                        color={voicemail.played === 0
+                          ? 'var(--mantine-color-blue-6)'
+                          : 'var(--mantine-color-dimmed)'}
+                      />
+                    </UnstyledButton>
+                  )}
+                </Table.Td>
+                <Table.Td>
+                  {call.number && !inList && (
+                    <Group gap={6} wrap="nowrap">
+                      <Button size="xs" variant="light" color="green" onClick={() => setModal({ list: 'whitelist', call })}>
+                        Add to Phonebook
+                      </Button>
+                      <Button size="xs" variant="light" color="red" onClick={() => setModal({ list: 'blacklist', call })}>
+                        Block
+                      </Button>
+                    </Group>
+                  )}
+                </Table.Td>
+              </Table.Tr>
+            );
+          })}
+          {rows.length === 0 && (
+            <Table.Tr>
+              <Table.Td colSpan={9} style={{ textAlign: 'center' }}>No calls found</Table.Td>
+            </Table.Tr>
+          )}
+        </Table.Tbody>
+      </Table>
+
+      {totalPages > 1 && (
+        <Pagination total={totalPages} value={page} onChange={setPage} />
+      )}
+
+      <AddToListModal
+        list={modal?.list ?? 'whitelist'}
+        opened={modal !== null}
+        onClose={() => setModal(null)}
+        initialValues={{ phoneNo: modal?.call.number ?? '', name: modal?.call.name ?? '' }}
+        onSuccess={loadLists}
+      />
+
+      <VoicemailModal
+        opened={voicemailModal !== null}
+        onClose={() => setVoicemailModal(null)}
+        message={voicemailModal?.message ?? null}
+        callerName={voicemailModal
+          ? resolveCallerName(voicemailModal.call.number, voicemailModal.call.name, whitelist, blacklist)
+          : ''}
+        callerNumber={voicemailModal?.call.number ?? null}
+        onDelete={handleVoicemailDelete}
+      />
+    </Stack>
+  );
+}
