@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useState, useRef } from 'react';
-import { Card, Text, Title, Table, Badge, Stack, Tabs, UnstyledButton } from '@mantine/core';
+import { Card, Text, Title, Table, Badge, Stack, Tabs, UnstyledButton, SimpleGrid } from '@mantine/core';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { IconRecordMail } from '@tabler/icons-react';
 import { apiClient } from '@/lib/api-client';
@@ -46,10 +46,9 @@ function CallsChart({ data, days, mounted }: { data: TrendRow[]; days: number; m
   useEffect(() => {
     if (!mounted || !containerRef.current) return;
     const el = containerRef.current;
-    if (el.offsetWidth > 0) { setChartWidth(el.offsetWidth); return; }
     const ro = new ResizeObserver(entries => {
       const w = entries[0]?.contentRect.width ?? 0;
-      if (w > 0) { setChartWidth(w); ro.disconnect(); }
+      if (w > 0) setChartWidth(w);
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -65,7 +64,7 @@ function CallsChart({ data, days, mounted }: { data: TrendRow[]; days: number; m
   return (
     <div ref={containerRef} style={{ width: '100%' }}>
       {chartWidth > 0 && (
-        <BarChart width={chartWidth} height={240} data={chartData} style={{ fontFamily: 'inherit', fontSize: 12 }}>
+        <BarChart width={chartWidth} height={300} data={chartData} style={{ fontFamily: 'inherit', fontSize: 12 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.15)" />
           <XAxis dataKey="date" tick={{ fontSize: 11 }} />
           <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
@@ -97,13 +96,19 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const rafId = requestAnimationFrame(() => setMounted(true));
+    const today = new Date().toISOString().split('T')[0];
+
     apiClient.calls.list({ limit: 10, offset: 0 }).then(data => {
       setRecentCalls(data.rows ?? []);
+    });
+
+    apiClient.calls.list({ limit: 500, offset: 0, startDate: today, endDate: today }).then(data => {
+      const rows = data.rows ?? [];
       setStats({
-        total: data.total ?? 0,
-        blocked:   data.rows?.filter((r) => r.action === 'Blocked').length  ?? 0,
-        permitted: data.rows?.filter((r) => r.action === 'Permitted').length ?? 0,
-        screened:  data.rows?.filter((r) => r.action === 'Screened').length  ?? 0,
+        total:     data.total ?? 0,
+        blocked:   rows.filter(r => r.action === 'Blocked').length,
+        permitted: rows.filter(r => r.action === 'Permitted').length,
+        screened:  rows.filter(r => r.action === 'Screened').length,
       });
     });
 
@@ -153,17 +158,18 @@ export default function DashboardPage() {
     <Stack gap="lg">
       <Title order={2}>Dashboard</Title>
 
-      <div style={{ display: 'grid', gridTemplateColumns: mounted ? 'repeat(4, 1fr)' : 'repeat(2, 1fr)', gap: '1rem' }}>
+      <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="md">
         {statCards.map((s) => (
           <Card key={s.label} shadow="sm" padding="lg" radius="md" withBorder>
             <Text size="sm" c="dimmed">{s.label}</Text>
             <Text size="2rem" fw={700} c={s.color}>{s.value}</Text>
           </Card>
         ))}
-      </div>
+      </SimpleGrid>
 
       <Card shadow="sm" padding="lg" radius="md" withBorder>
         <Title order={4} mb="md">Recent Calls</Title>
+        <div style={{ overflowX: 'auto' }}>
         <Table
           verticalSpacing={mounted ? 'xs' : undefined}
           fz={mounted ? 'sm' : undefined}
@@ -215,6 +221,7 @@ export default function DashboardPage() {
             )}
           </Table.Tbody>
         </Table>
+        </div>
       </Card>
 
       <Card shadow="sm" padding="lg" radius="md" withBorder>
@@ -234,7 +241,7 @@ export default function DashboardPage() {
       </Card>
 
       {mounted && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
           <Card shadow="sm" padding="lg" radius="md" withBorder>
             <Title order={4} mb="md">Top 10 Callers</Title>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -288,7 +295,7 @@ export default function DashboardPage() {
               </tbody>
             </table>
           </Card>
-        </div>
+        </SimpleGrid>
       )}
 
       <VoicemailModal

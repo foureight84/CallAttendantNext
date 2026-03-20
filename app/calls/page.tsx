@@ -128,9 +128,10 @@ export default function CallsPage() {
           <Select
             data={PAGE_SIZE_OPTIONS}
             value={String(pageSize)}
-            onChange={v => { setPageSize(Number(v)); setPage(1); }}
+            onChange={v => { if (v) { setPageSize(Number(v)); setPage(1); } }}
             w={80}
             size="xs"
+            allowDeselect={false}
           />
         </Group>
       </Group>
@@ -202,7 +203,9 @@ export default function CallsPage() {
       </Table>
 
       {totalPages > 1 && (
-        <Pagination total={totalPages} value={page} onChange={setPage} />
+        <Group justify="center">
+          <Pagination total={totalPages} value={page} onChange={setPage} withEdges />
+        </Group>
       )}
 
       <AddToListModal

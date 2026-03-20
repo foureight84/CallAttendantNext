@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MantineProvider, AppShell, NavLink, Group, Text, Badge, ActionIcon, Tooltip, useMantineColorScheme } from '@mantine/core';
+import { MantineProvider, AppShell, NavLink, Group, Text, Badge, ActionIcon, Tooltip, useMantineColorScheme, Burger } from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
 import type { MantineColorSchemeManager, MantineColorScheme } from '@mantine/core';
 import { IconPhone, IconLayoutDashboard, IconPhoneCall, IconRecordMail, IconAddressBook, IconBan, IconSettings, IconBug, IconSun, IconMoon, IconDeviceDesktop } from '@tabler/icons-react';
 import { Notifications } from '@mantine/notifications';
@@ -76,6 +77,7 @@ export function AppProviders({ children, colorScheme }: { children: React.ReactN
   const [unreadCount, setUnreadCount] = useState(0);
   const [debugConsole, setDebugConsole] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [opened, { toggle, close }] = useDisclosure();
 
   useEffect(() => {
     setMounted(true);
@@ -116,7 +118,19 @@ export function AppProviders({ children, colorScheme }: { children: React.ReactN
     <MantineProvider colorSchemeManager={colorSchemeManager} defaultColorScheme={colorScheme}>
       <Notifications position="top-right" />
       <CallNotification />
-      <AppShell navbar={{ width: 200, breakpoint: 'sm' }} padding="md">
+      <AppShell
+        navbar={{ width: 200, breakpoint: 'sm', collapsed: { mobile: !opened } }}
+        header={{ height: { base: 50, sm: 0 } }}
+        padding="md"
+      >
+        <AppShell.Header hiddenFrom="sm">
+          <Group h="100%" px="sm" gap="sm">
+            <Burger opened={opened} onClick={toggle} size="sm" aria-label="Toggle navigation" />
+            <IconPhone size={20} stroke={1.5} />
+            <Text fw={700} size="md">Call Attendant</Text>
+          </Group>
+        </AppShell.Header>
+
         <AppShell.Navbar p="xs" style={{ display: 'flex', flexDirection: 'column' }}>
           <div style={{ flex: 1 }}>
             <Group mb="md" p="xs" gap="xs" wrap="nowrap">
@@ -136,6 +150,7 @@ export function AppProviders({ children, colorScheme }: { children: React.ReactN
                     <Badge size="sm" color="blue">{item.badge > 999 ? '999+' : item.badge}</Badge>
                   ) : undefined
                 }
+                onClick={close}
               />
             ))}
           </div>
