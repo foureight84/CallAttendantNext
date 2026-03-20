@@ -27,6 +27,9 @@ export default function SettingsPage() {
       debugConsole: false,
       greetingVoice: '',
       greetingLengthScale: 1.0,
+      logFile: './logs/modem.log',
+      logMaxBytes: 5 * 1024 * 1024,
+      logKeepFiles: 2,
     },
   });
 
@@ -213,6 +216,31 @@ export default function SettingsPage() {
               description="Shows the Debug Console menu item and allows access to /debug."
               {...form.getInputProps('debugConsole', { type: 'checkbox' })}
             />
+          </Card>
+
+          <Card shadow="sm" padding="lg" radius="md" withBorder>
+            <Title order={4} mb="md">Logging</Title>
+            <Stack gap="sm">
+              <TextInput
+                label="Log File Path"
+                description="Path to the modem log file (relative to the app root). Changes take effect immediately."
+                {...form.getInputProps('logFile')}
+              />
+              <NumberInput
+                label="Max Log File Size (bytes)"
+                description="Rotate the log file when it exceeds this size. Default: 5 242 880 (5 MB)."
+                min={65536}
+                step={1048576}
+                {...form.getInputProps('logMaxBytes')}
+              />
+              <NumberInput
+                label="Rotated Files to Keep"
+                description="Number of rotated backup files to retain (modem.log.1, .2, …)."
+                min={0}
+                max={10}
+                {...form.getInputProps('logKeepFiles')}
+              />
+            </Stack>
           </Card>
 
           <Button type="submit">Save Settings</Button>

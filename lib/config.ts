@@ -17,4 +17,7 @@ export const config = {
   piperBinary:      process.env.PIPER_BINARY       ?? 'piper',
   piperModelsDir:   process.env.PIPER_MODELS_DIR   ?? './piper-models',
   piperLengthScale: parseFloat(process.env.PIPER_LENGTH_SCALE ?? '1.0'),
+  logFile:          process.env.LOG_FILE            ?? './logs/modem.log',
+  logMaxBytes:      parseInt(process.env.LOG_MAX_BYTES  ?? String(5 * 1024 * 1024), 10),
+  logKeepFiles:     parseInt(process.env.LOG_KEEP_FILES ?? '2', 10),
 } as const;

@@ -6,7 +6,7 @@ import {
   getMessages, getMessagesCount, markMessagePlayed, markMessageUnplayed, deleteMessage, getUnplayedMessageCount,
   getSettings, saveSettings,
 } from '@/lib/db';
-import { callEvents } from '@/lib/events';
+import { callEvents, updateLogConfig } from '@/lib/events';
 import { unlink, readdir } from 'fs/promises';
 import path from 'path';
 import { config } from '@/lib/config';
@@ -101,6 +101,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
 
   if (route === 'settings') {
     await saveSettings(body);
+    const saved = await getSettings();
+    updateLogConfig({ logFile: saved.logFile, logMaxBytes: saved.logMaxBytes, logKeepFiles: saved.logKeepFiles });
     return json({ ok: true });
   }
 

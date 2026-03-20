@@ -9,6 +9,7 @@ services:
       - ./messages:/app/messages
       - ./callattendant.db:/app/callattendant.db
       - ./piper-models:/app/piper-models
+      - ./logs:/app/logs
     environment:
       - SERIAL_PORT=/dev/ttyUSB0
       - SERIAL_BAUD_RATE=57600

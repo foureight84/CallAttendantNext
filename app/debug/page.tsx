@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState, KeyboardEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, KeyboardEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api-client';
-import { Stack, Title, Card, Group, Badge, Text, Switch, Button, Code, ScrollArea, TextInput, ActionIcon } from '@mantine/core';
+import { Stack, Title, Card, Group, Badge, Text, Switch, Button, Code, ScrollArea, TextInput, ActionIcon, SegmentedControl } from '@mantine/core';
 import type { ModemLogEntry, LogLevel } from '@/lib/events';
 
 const levelColor: Record<LogLevel, string> = {
@@ -14,12 +14,22 @@ const levelColor: Record<LogLevel, string> = {
 };
 
 const COMMON_COMMANDS = ['ATI', 'ATZ', 'ATE0', 'AT+VCID=1', 'AT+FCLASS?', 'ATH', 'ATA', 'AT'];
-const MAX_LINES = 500;
+const MAX_LINES = 2000;
 
 export default function DebugPage() {
   const router = useRouter();
-  const [logs, setLogs] = useState<ModemLogEntry[]>([]);
+
+  // Stream mode state
+  const [streamLogs, setStreamLogs] = useState<ModemLogEntry[]>([]);
   const [connected, setConnected] = useState(false);
+  const pendingRef = useRef<ModemLogEntry[]>([]);
+
+  // Log mode state
+  const [logEntries, setLogEntries] = useState<ModemLogEntry[]>([]);
+  const [loadingLog, setLoadingLog] = useState(false);
+
+  // Shared state
+  const [mode, setMode] = useState<'stream' | 'log'>('stream');
   const [paused, setPaused] = useState(false);
   const [showData, setShowData] = useState(true);
   const [command, setCommand] = useState('');
@@ -38,13 +48,39 @@ export default function DebugPage() {
     }).catch(() => {});
   }, [router]);
 
+  const fetchLogHistory = useCallback(async () => {
+    setLoadingLog(true);
+    try {
+      const res = await fetch('/api/logs?lines=2000');
+      if (res.ok) {
+        setLogEntries(await res.json() as ModemLogEntry[]);
+      }
+    } finally {
+      setLoadingLog(false);
+    }
+  }, []);
+
+  // Fetch log history when entering Log mode
+  useEffect(() => {
+    if (mode === 'log') fetchLogHistory();
+  }, [mode, fetchLogHistory]);
+
+  // Auto-refresh every 5s in Log mode (pauses when paused toggle is on)
+  useEffect(() => {
+    if (mode !== 'log') return;
+    const id = setInterval(() => {
+      if (!pausedRef.current) fetchLogHistory();
+    }, 5000);
+    return () => clearInterval(id);
+  }, [mode, fetchLogHistory]);
+
   const restartModem = async () => {
     setRestarting(true);
     try {
       const res = await fetch('/api/modem/restart', { method: 'POST' });
       if (!res.ok) {
         const err = await res.json() as { error: string };
-        setLogs(prev => {
+        setStreamLogs(prev => {
           const entry = { ts: new Date().toISOString(), level: 'error' as const, msg: `Restart failed: ${err.error}` };
           const next = [...prev, entry];
           return next.length > MAX_LINES ? next.slice(-MAX_LINES) : next;
@@ -59,6 +95,20 @@ export default function DebugPage() {
     viewport.current?.scrollTo({ top: viewport.current.scrollHeight, behavior: 'smooth' });
   };
 
+  // Flush pending SSE entries into state at 10fps to avoid per-message re-renders during data floods
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (pendingRef.current.length === 0) return;
+      const toAdd = pendingRef.current;
+      pendingRef.current = [];
+      setStreamLogs(prev => {
+        const next = [...prev, ...toAdd];
+        return next.length > MAX_LINES ? next.slice(-MAX_LINES) : next;
+      });
+    }, 100);
+    return () => clearInterval(id);
+  }, []);
+
   useEffect(() => {
     const evtSource = new EventSource('/api/events');
     evtSource.onopen = () => setConnected(true);
@@ -68,10 +118,7 @@ export default function DebugPage() {
         const data = JSON.parse(event.data) as { type: string; payload?: ModemLogEntry };
         if (data.type === 'modem-log' && data.payload) {
           if (pausedRef.current) return;
-          setLogs(prev => {
-            const next = [...prev, data.payload!];
-            return next.length > MAX_LINES ? next.slice(-MAX_LINES) : next;
-          });
+          pendingRef.current.push(data.payload);
         }
       } catch {}
     };
@@ -80,7 +127,7 @@ export default function DebugPage() {
 
   useEffect(() => {
     if (!paused) scrollToBottom();
-  }, [logs, paused]);
+  }, [streamLogs, logEntries, paused]);
 
   const sendCommand = async (cmd: string) => {
     const trimmed = cmd.trim();
@@ -97,7 +144,7 @@ export default function DebugPage() {
       });
       if (!res.ok) {
         const err = await res.json() as { error: string };
-        setLogs(prev => {
+        setStreamLogs(prev => {
           const entry = { ts: new Date().toISOString(), level: 'error' as const, msg: err.error };
           const next = [...prev, entry];
           return next.length > MAX_LINES ? next.slice(-MAX_LINES) : next;
@@ -124,20 +171,34 @@ export default function DebugPage() {
     }
   };
 
-  const filtered = showData ? logs : logs.filter(l => l.level !== 'data');
+  const logs = mode === 'stream' ? streamLogs : logEntries;
+  const filtered = showData && mode === 'stream' ? logs : logs.filter(l => l.level !== 'data');
 
   return (
     <Stack gap="lg">
       <Group justify="space-between">
         <Title order={2}>Modem Debug Console</Title>
         <Group>
+          <SegmentedControl
+            value={mode}
+            onChange={v => setMode(v as 'stream' | 'log')}
+            data={[{ label: 'Stream', value: 'stream' }, { label: 'Log', value: 'log' }]}
+            size="xs"
+          />
           <Badge color={connected ? 'green' : 'red'} variant="dot">
             {connected ? 'SSE Connected' : 'Disconnected'}
           </Badge>
-          <Switch label="Raw data" checked={showData} onChange={e => setShowData(e.currentTarget.checked)} />
+          {mode === 'stream' && (
+            <Switch label="Raw data" checked={showData} onChange={e => setShowData(e.currentTarget.checked)} />
+          )}
           <Switch label="Pause" checked={paused} onChange={e => setPaused(e.currentTarget.checked)} />
+          {mode === 'log' && (
+            <Button size="xs" variant="light" loading={loadingLog} onClick={fetchLogHistory}>Refresh</Button>
+          )}
           <Button size="xs" variant="light" color="orange" loading={restarting} onClick={restartModem}>Reinitialize Modem</Button>
-          <Button size="xs" variant="light" color="red" onClick={() => setLogs([])}>Clear</Button>
+          {mode === 'stream' && (
+            <Button size="xs" variant="light" color="red" onClick={() => setStreamLogs([])}>Clear</Button>
+          )}
         </Group>
       </Group>
 
@@ -146,7 +207,9 @@ export default function DebugPage() {
         <ScrollArea h={480} viewportRef={viewport}>
           <Code block style={{ background: 'transparent', fontSize: 12, padding: '12px 16px', fontFamily: 'monospace' }}>
             {filtered.length === 0 && (
-              <Text c="dimmed" size="xs">Waiting for modem activity...</Text>
+              <Text c="dimmed" size="xs">
+                {mode === 'log' ? (loadingLog ? 'Loading log history...' : 'No log entries found.') : 'Waiting for modem activity...'}
+              </Text>
             )}
             {filtered.map((entry, i) => (
               <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 2, lineHeight: '1.5' }}>

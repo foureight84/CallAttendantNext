@@ -45,6 +45,9 @@ export const AppSettingsSchema = z.object({
   debugConsole:           z.boolean(),
   greetingVoice:          z.string(),
   greetingLengthScale:    z.number(),
+  logFile:                z.string(),
+  logMaxBytes:            z.number(),
+  logKeepFiles:           z.number(),
 });
 
 const OkSchema = z.object({ ok: z.literal(true) });

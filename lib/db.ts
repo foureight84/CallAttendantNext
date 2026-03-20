@@ -323,6 +323,9 @@ export interface AppSettings {
   debugConsole: boolean;
   greetingVoice: string;
   greetingLengthScale: number;
+  logFile: string;
+  logMaxBytes: number;
+  logKeepFiles: number;
 }
 
 export async function getSettings(): Promise<AppSettings> {
@@ -340,6 +343,9 @@ export async function getSettings(): Promise<AppSettings> {
     debugConsole:           (map['debugConsole']  ?? String(config.debugConsole))  === 'true',
     greetingVoice:          map['greetingVoice']          ?? '',
     greetingLengthScale:    parseFloat(map['greetingLengthScale'] ?? String(config.piperLengthScale)),
+    logFile:      map['logFile']      ?? config.logFile,
+    logMaxBytes:  parseInt(map['logMaxBytes']  ?? String(config.logMaxBytes),  10),
+    logKeepFiles: parseInt(map['logKeepFiles'] ?? String(config.logKeepFiles), 10),
   };
 }
 
