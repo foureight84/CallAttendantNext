@@ -15,8 +15,8 @@ RUN apt-get update && apt-get install -y \
 
 # Download piper TTS with all shared libraries and espeak-ng-data
 RUN curl -L https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_linux_x86_64.tar.gz \
-    | tar -xz -C /opt
-ENV PIPER_BINARY=/opt/piper/piper
+    | tar -xz -C /opt \
+    && ln -s /opt/piper/piper /usr/bin/piper
 
 WORKDIR /app
 
