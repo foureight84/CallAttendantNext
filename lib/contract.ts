@@ -41,6 +41,7 @@ export const AppSettingsSchema = z.object({
   ringsBeforeVmScreened:  z.number(),
   blocklistAction:        z.number(),
   ringsBeforeVmBlocklist: z.number(),
+  autoBlockSpam:          z.boolean(),
   enableGpio:             z.boolean(),
   debugConsole:           z.boolean(),
   greetingVoice:          z.string(),

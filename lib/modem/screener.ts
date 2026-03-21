@@ -1,4 +1,4 @@
-import { isWhitelisted, isBlacklisted, getSettings } from '../db';
+import { isWhitelisted, isBlacklisted, getSettings, addToBlacklist } from '../db';
 import { checkNomorobo } from './nomorobo';
 import { modemLog } from '../events';
 
@@ -11,7 +11,7 @@ export interface ScreeningResult {
 }
 
 export async function screenCaller(name: string, number: string): Promise<ScreeningResult> {
-  const { screeningMode: modes, blockService, spamThreshold } = await getSettings();
+  const { screeningMode: modes, blockService, spamThreshold, autoBlockSpam } = await getSettings();
 
   if (modes.includes('blacklist')) {
     const entry = await isBlacklisted(number);
@@ -43,7 +43,17 @@ export async function screenCaller(name: string, number: string): Promise<Screen
     const result = await checkNomorobo(number);
     modemLog('info', `Nomorobo result: score=${result.score} — ${result.reason}`);
     if (result.score >= spamThreshold) {
-      return { action: 'Blocked', reason: result.reason };
+      const blockReason = `${result.reason} (score: ${result.score})`;
+      if (autoBlockSpam) {
+        modemLog('info', `Auto-blocking ${number} — adding to blocklist`);
+        await addToBlacklist({
+          phoneNo: number,
+          name: name,
+          reason: blockReason,
+          systemDateTime: new Date().toISOString(),
+        }).catch(err => modemLog('warn', `Failed to auto-block ${number}: ${err}`));
+      }
+      return { action: 'Blocked', reason: blockReason };
     }
     if (result.score > 0) {
       return { action: 'Screened', reason: result.reason };

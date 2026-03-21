@@ -11,6 +11,7 @@ export const config = {
   ringsBeforeVmScreened:  parseInt(process.env.RINGS_BEFORE_VM_SCREENED  ?? '2', 10),
   blocklistAction:        parseInt(process.env.BLOCKLIST_ACTION           ?? '2', 10),
   ringsBeforeVmBlocklist: parseInt(process.env.RINGS_BEFORE_VM_BLOCKLIST  ?? '0', 10),
+  autoBlockSpam: process.env.AUTO_BLOCK_SPAM !== 'false',
   enableGpio: process.env.ENABLE_GPIO === 'true',
   debugConsole: process.env.DEBUG_CONSOLE === 'true',
   port: parseInt(process.env.PORT ?? '3000', 10),

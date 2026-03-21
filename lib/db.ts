@@ -172,7 +172,7 @@ function buildListConditions(table: typeof whitelist | typeof blacklist, search?
 export async function getWhitelist(limit = 20, offset = 0, search?: string, startDate?: string, endDate?: string): Promise<ListRow[]> {
   return db.select().from(whitelist)
     .where(buildListConditions(whitelist, search, startDate, endDate))
-    .orderBy(whitelist.phoneNo).limit(limit).offset(offset);
+    .orderBy(desc(whitelist.systemDateTime)).limit(limit).offset(offset);
 }
 
 export async function getWhitelistCount(search?: string, startDate?: string, endDate?: string): Promise<number> {
@@ -205,7 +205,7 @@ export async function isWhitelisted(phoneNo: string): Promise<ListRow | undefine
 export async function getBlacklist(limit = 20, offset = 0, search?: string, startDate?: string, endDate?: string): Promise<ListRow[]> {
   return db.select().from(blacklist)
     .where(buildListConditions(blacklist, search, startDate, endDate))
-    .orderBy(blacklist.phoneNo).limit(limit).offset(offset);
+    .orderBy(desc(blacklist.systemDateTime)).limit(limit).offset(offset);
 }
 
 export async function getBlacklistCount(search?: string, startDate?: string, endDate?: string): Promise<number> {
@@ -346,6 +346,7 @@ export interface AppSettings {
   ringsBeforeVmScreened: number;
   blocklistAction: number;
   ringsBeforeVmBlocklist: number;
+  autoBlockSpam: boolean;
   enableGpio: boolean;
   debugConsole: boolean;
   greetingVoice: string;
@@ -366,6 +367,7 @@ export async function getSettings(): Promise<AppSettings> {
     ringsBeforeVmScreened:  parseInt(map['ringsBeforeVmScreened']  ?? String(config.ringsBeforeVmScreened),  10),
     blocklistAction:        parseInt(map['blocklistAction']         ?? String(config.blocklistAction),         10),
     ringsBeforeVmBlocklist: parseInt(map['ringsBeforeVmBlocklist']  ?? String(config.ringsBeforeVmBlocklist),  10),
+    autoBlockSpam:          (map['autoBlockSpam'] ?? String(config.autoBlockSpam)) === 'true',
     enableGpio:             (map['enableGpio']    ?? String(config.enableGpio))    === 'true',
     debugConsole:           (map['debugConsole']  ?? String(config.debugConsole))  === 'true',
     greetingVoice:          map['greetingVoice']          ?? '',
@@ -391,6 +393,7 @@ export async function seedSettingsFromEnv(): Promise<void> {
     spamThreshold: config.spamThreshold, ringsBeforeVm: config.ringsBeforeVm,
     ringsBeforeVmScreened: config.ringsBeforeVmScreened,
     blocklistAction: config.blocklistAction, ringsBeforeVmBlocklist: config.ringsBeforeVmBlocklist,
+    autoBlockSpam: config.autoBlockSpam,
     enableGpio: config.enableGpio,
     debugConsole: config.debugConsole,
   });

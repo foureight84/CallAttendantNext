@@ -17,6 +17,7 @@ export default function SettingsPage() {
       serialPort: '/dev/ttyUSB0',
       serialBaudRate: 57600,
       screeningMode: ['whitelist', 'blacklist'],
+      autoBlockSpam: true,
       blockService: 'NOMOROBO',
       spamThreshold: 2,
       ringsBeforeVm: 4,
@@ -135,6 +136,16 @@ export default function SettingsPage() {
                   { value: 'NONE', label: 'None (lists only)' },
                 ]}
                 {...form.getInputProps('blockService')}
+              />
+              <Switch
+                label="Auto-block numbers that meet the spam threshold"
+                description={
+                  <>
+                    When enabled, any caller flagged at or above the spam threshold is automatically added to the blocklist — saving time from having to look them up again.{' '}
+                    <strong>Note:</strong> numbers stay blocked permanently until removed. Phone numbers can change hands, so a number that was a spam caller today may belong to a legitimate caller in the future.
+                  </>
+                }
+                {...form.getInputProps('autoBlockSpam', { type: 'checkbox' })}
               />
               <div>
                 <Text size="sm" mb={4}>Spam Threshold: {form.values.spamThreshold}</Text>
