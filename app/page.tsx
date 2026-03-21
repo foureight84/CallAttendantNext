@@ -130,11 +130,11 @@ export default function DashboardPage() {
     apiClient.calls.top().then(d => { setTopCallers(d.callers); setTopBlocked(d.blocked); }).catch(() => {});
 
     Promise.all([
-      apiClient.whitelist.list(),
-      apiClient.blacklist.list(),
+      apiClient.whitelist.list({ limit: 10000 }),
+      apiClient.blacklist.list({ limit: 10000 }),
     ]).then(([wl, bl]) => {
-      setWhitelist(new Map(wl.map((e: ListEntry) => [e.phoneNo, e.name])));
-      setBlacklist(new Map(bl.map((e: ListEntry) => [e.phoneNo, e.name])));
+      setWhitelist(new Map(wl.rows.map((e: ListEntry) => [e.phoneNo, e.name])));
+      setBlacklist(new Map(bl.rows.map((e: ListEntry) => [e.phoneNo, e.name])));
     });
 
     return () => cancelAnimationFrame(rafId);

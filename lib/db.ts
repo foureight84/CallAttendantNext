@@ -158,8 +158,21 @@ export async function getCallTrend(days = 7): Promise<{ date: string; total: num
 // --- Whitelist / Blacklist ---
 export type ListRow = typeof whitelist.$inferSelect;
 
-export async function getWhitelist(): Promise<ListRow[]> {
-  return db.select().from(whitelist).orderBy(whitelist.phoneNo);
+export async function getWhitelist(limit = 20, offset = 0, search?: string): Promise<ListRow[]> {
+  const condition = search
+    ? sql`lower(${whitelist.phoneNo}) LIKE ${'%' + search.toLowerCase().replace(/[%_\\]/g, '') + '%'}
+       OR lower(coalesce(${whitelist.name}, '')) LIKE ${'%' + search.toLowerCase().replace(/[%_\\]/g, '') + '%'}`
+    : undefined;
+  return db.select().from(whitelist).where(condition).orderBy(whitelist.phoneNo).limit(limit).offset(offset);
+}
+
+export async function getWhitelistCount(search?: string): Promise<number> {
+  const condition = search
+    ? sql`lower(${whitelist.phoneNo}) LIKE ${'%' + search.toLowerCase().replace(/[%_\\]/g, '') + '%'}
+       OR lower(coalesce(${whitelist.name}, '')) LIKE ${'%' + search.toLowerCase().replace(/[%_\\]/g, '') + '%'}`
+    : undefined;
+  const [row] = await db.select({ count: drizzleCount() }).from(whitelist).where(condition);
+  return row?.count ?? 0;
 }
 
 export async function addToWhitelist(entry: { phoneNo: string; name?: string | null; reason?: string | null; systemDateTime?: string | null }): Promise<void> {
@@ -183,8 +196,21 @@ export async function isWhitelisted(phoneNo: string): Promise<ListRow | undefine
   return wildcards.find(w => wildcardMatch(w.phoneNo, phoneNo));
 }
 
-export async function getBlacklist(): Promise<ListRow[]> {
-  return db.select().from(blacklist).orderBy(blacklist.phoneNo);
+export async function getBlacklist(limit = 20, offset = 0, search?: string): Promise<ListRow[]> {
+  const condition = search
+    ? sql`lower(${blacklist.phoneNo}) LIKE ${'%' + search.toLowerCase().replace(/[%_\\]/g, '') + '%'}
+       OR lower(coalesce(${blacklist.name}, '')) LIKE ${'%' + search.toLowerCase().replace(/[%_\\]/g, '') + '%'}`
+    : undefined;
+  return db.select().from(blacklist).where(condition).orderBy(blacklist.phoneNo).limit(limit).offset(offset);
+}
+
+export async function getBlacklistCount(search?: string): Promise<number> {
+  const condition = search
+    ? sql`lower(${blacklist.phoneNo}) LIKE ${'%' + search.toLowerCase().replace(/[%_\\]/g, '') + '%'}
+       OR lower(coalesce(${blacklist.name}, '')) LIKE ${'%' + search.toLowerCase().replace(/[%_\\]/g, '') + '%'}`
+    : undefined;
+  const [row] = await db.select({ count: drizzleCount() }).from(blacklist).where(condition);
+  return row?.count ?? 0;
 }
 
 export async function addToBlacklist(entry: { phoneNo: string; name?: string | null; reason?: string | null; systemDateTime?: string | null }): Promise<void> {

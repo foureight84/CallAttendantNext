@@ -28,7 +28,7 @@ function resolveCallerName(
   return name.toUpperCase() === 'O' ? 'UNKNOWN' : name;
 }
 
-const PAGE_SIZE_OPTIONS = ['50', '100'];
+const PAGE_SIZE_OPTIONS = ['10', '20', '50', '100'];
 
 export default function CallsPage() {
   const [rows, setRows] = useState<CallLog[]>([]);
@@ -36,7 +36,7 @@ export default function CallsPage() {
   const [search, setSearch] = useState('');
   const [debouncedSearch] = useDebouncedValue(search, 300);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(20);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [whitelist, setWhitelist] = useState<Map<string, string | null>>(new Map());
@@ -47,11 +47,11 @@ export default function CallsPage() {
 
   const loadLists = useCallback(() => {
     Promise.all([
-      apiClient.whitelist.list(),
-      apiClient.blacklist.list(),
+      apiClient.whitelist.list({ limit: 10000 }),
+      apiClient.blacklist.list({ limit: 10000 }),
     ]).then(([wl, bl]) => {
-      setWhitelist(new Map(wl.map((e: ListEntry) => [e.phoneNo, e.name])));
-      setBlacklist(new Map(bl.map((e: ListEntry) => [e.phoneNo, e.name])));
+      setWhitelist(new Map(wl.rows.map((e: ListEntry) => [e.phoneNo, e.name])));
+      setBlacklist(new Map(bl.rows.map((e: ListEntry) => [e.phoneNo, e.name])));
     });
   }, []);
 

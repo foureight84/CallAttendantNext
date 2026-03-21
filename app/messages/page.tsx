@@ -34,7 +34,7 @@ export default function MessagesPage() {
   const [unplayedOnly, setUnplayedOnly] = useState(false);
 
   useEffect(() => {
-    apiClient.whitelist.list().then(setWhitelist);
+    apiClient.whitelist.list({ limit: 10000 }).then(d => setWhitelist(d.rows));
   }, []);
 
   const load = useCallback(() => {

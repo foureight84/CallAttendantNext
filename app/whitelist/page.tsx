@@ -1,24 +1,38 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Stack, Title, Table, Button, Group, Text } from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
+import { Stack, Title, Table, Button, Group, Text, TextInput, Select, Pagination, Card } from '@mantine/core';
+import { useDebouncedValue, useDisclosure } from '@mantine/hooks';
 import { AddToListModal } from '@/components/AddToListModal';
 import { apiClient } from '@/lib/api-client';
 import type { ListEntry } from '@/lib/contract';
 
+const PAGE_SIZE_OPTIONS = ['10', '20', '50', '100'];
+
 export default function WhitelistPage() {
-  const [rows, setRows] = useState<ListEntry[]>([]);
+  const [rows, setRows]         = useState<ListEntry[]>([]);
+  const [total, setTotal]       = useState(0);
+  const [search, setSearch]     = useState('');
+  const [debouncedSearch]       = useDebouncedValue(search, 300);
+  const [page, setPage]         = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [opened, { open, close }] = useDisclosure(false);
   const [editEntry, setEditEntry] = useState<ListEntry | null>(null);
 
-  const load = () => apiClient.whitelist.list().then(setRows);
-  useEffect(() => { load(); }, []);
+  const load = () =>
+    apiClient.whitelist.list({ limit: pageSize, offset: (page - 1) * pageSize, search: debouncedSearch || undefined })
+      .then(d => { setRows(d.rows); setTotal(d.total); });
+
+  useEffect(() => {
+    load();
+  }, [page, pageSize, debouncedSearch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const remove = async (phoneNo: string) => {
     await apiClient.whitelist.remove({ phoneNo });
     load();
   };
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   return (
     <Stack gap="lg">
@@ -30,6 +44,30 @@ export default function WhitelistPage() {
       <Text c="dimmed" size="sm">
         Numbers in the phonebook are always permitted without screening.
       </Text>
+
+      <Card shadow="sm" padding="md" radius="md" withBorder>
+        <TextInput
+          label="Search"
+          placeholder="Name or number..."
+          value={search}
+          onChange={e => { setSearch(e.target.value); setPage(1); }}
+        />
+      </Card>
+
+      <Group justify="space-between" align="center">
+        <Text c="dimmed" size="sm">{total} entries</Text>
+        <Group gap="xs" align="center">
+          <Text size="sm" c="dimmed">Per page:</Text>
+          <Select
+            data={PAGE_SIZE_OPTIONS}
+            value={String(pageSize)}
+            onChange={v => { if (v) { setPageSize(Number(v)); setPage(1); } }}
+            w={80}
+            size="xs"
+            allowDeselect={false}
+          />
+        </Group>
+      </Group>
 
       <Table striped highlightOnHover>
         <Table.Thead>
@@ -61,6 +99,12 @@ export default function WhitelistPage() {
           )}
         </Table.Tbody>
       </Table>
+
+      {totalPages > 1 && (
+        <Group justify="center">
+          <Pagination total={totalPages} value={page} onChange={setPage} withEdges />
+        </Group>
+      )}
 
       <AddToListModal list="whitelist" opened={opened} onClose={close} onSuccess={load} />
       <AddToListModal

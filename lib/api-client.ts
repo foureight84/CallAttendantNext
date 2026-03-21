@@ -33,12 +33,24 @@ export const apiClient = {
       apiFetch<{ callers: { number: string; name: string | null; count: number }[]; blocked: { number: string; name: string | null; count: number }[] }>('/api/calls/top'),
   },
   whitelist: {
-    list:   ()                                                          => apiFetch<ListEntry[]>('/api/whitelist'),
+    list: (query: { limit?: number; offset?: number; search?: string } = {}) => {
+      const params = new URLSearchParams();
+      if (query.limit  != null) params.set('limit',  String(query.limit));
+      if (query.offset != null) params.set('offset', String(query.offset));
+      if (query.search)         params.set('search', query.search);
+      return apiFetch<{ rows: ListEntry[]; total: number }>(`/api/whitelist?${params}`);
+    },
     add:    (body: { phoneNo: string; name?: string; reason?: string }) => apiFetch<{ ok: true }>('/api/whitelist', { method: 'POST',   ...jsonBody(body) }),
     remove: (body: { phoneNo: string })                                 => apiFetch<{ ok: true }>('/api/whitelist', { method: 'DELETE', ...jsonBody(body) }),
   },
   blacklist: {
-    list:   ()                                                          => apiFetch<ListEntry[]>('/api/blacklist'),
+    list: (query: { limit?: number; offset?: number; search?: string } = {}) => {
+      const params = new URLSearchParams();
+      if (query.limit  != null) params.set('limit',  String(query.limit));
+      if (query.offset != null) params.set('offset', String(query.offset));
+      if (query.search)         params.set('search', query.search);
+      return apiFetch<{ rows: ListEntry[]; total: number }>(`/api/blacklist?${params}`);
+    },
     add:    (body: { phoneNo: string; name?: string; reason?: string }) => apiFetch<{ ok: true }>('/api/blacklist', { method: 'POST',   ...jsonBody(body) }),
     remove: (body: { phoneNo: string })                                 => apiFetch<{ ok: true }>('/api/blacklist', { method: 'DELETE', ...jsonBody(body) }),
   },

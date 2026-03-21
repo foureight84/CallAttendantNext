@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   getCallLog, getCallLogCount, getCallTrend, getTopCallers, getTopBlockedCallers,
-  getWhitelist, addToWhitelist, removeFromWhitelist,
-  getBlacklist, addToBlacklist, removeFromBlacklist,
+  getWhitelist, getWhitelistCount, addToWhitelist, removeFromWhitelist,
+  getBlacklist, getBlacklistCount, addToBlacklist, removeFromBlacklist,
   getMessages, getMessagesCount, markMessagePlayed, markMessageUnplayed, deleteMessage, getUnplayedMessageCount,
   getSettings, saveSettings,
 } from '@/lib/db';
@@ -44,11 +44,19 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   }
 
   if (route === 'whitelist') {
-    return json(await getWhitelist());
+    const limit  = Number(searchParams.get('limit')  ?? 20);
+    const offset = Number(searchParams.get('offset') ?? 0);
+    const search = searchParams.get('search') ?? undefined;
+    const [rows, total] = await Promise.all([getWhitelist(limit, offset, search), getWhitelistCount(search)]);
+    return json({ rows, total });
   }
 
   if (route === 'blacklist') {
-    return json(await getBlacklist());
+    const limit  = Number(searchParams.get('limit')  ?? 20);
+    const offset = Number(searchParams.get('offset') ?? 0);
+    const search = searchParams.get('search') ?? undefined;
+    const [rows, total] = await Promise.all([getBlacklist(limit, offset, search), getBlacklistCount(search)]);
+    return json({ rows, total });
   }
 
   if (route === 'messages') {
