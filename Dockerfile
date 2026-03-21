@@ -13,9 +13,10 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Download piper TTS standalone binary (rhasspy/piper v2023.11.14-2)
+# Download piper TTS with all shared libraries and espeak-ng-data
 RUN curl -L https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_linux_x86_64.tar.gz \
-    | tar -xz -C /usr/local/bin --strip-components=1 piper/piper
+    | tar -xz -C /opt
+ENV PIPER_BINARY=/opt/piper/piper
 
 WORKDIR /app
 

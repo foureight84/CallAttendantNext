@@ -10,11 +10,12 @@ async function getModelSampleRate(modelPath: string): Promise<number> {
 
 function piperEnv(): NodeJS.ProcessEnv {
   const piperDir = path.resolve(path.dirname(config.piperBinary));
-  const existing = process.env.DYLD_LIBRARY_PATH ?? '';
-  return {
-    ...process.env,
-    DYLD_LIBRARY_PATH: existing ? `${piperDir}:${existing}` : piperDir,
-  };
+  if (process.platform === 'darwin') {
+    const existing = process.env.DYLD_LIBRARY_PATH ?? '';
+    return { ...process.env, DYLD_LIBRARY_PATH: existing ? `${piperDir}:${existing}` : piperDir };
+  }
+  const existing = process.env.LD_LIBRARY_PATH ?? '';
+  return { ...process.env, LD_LIBRARY_PATH: existing ? `${piperDir}:${existing}` : piperDir };
 }
 
 function waitForClose(proc: ReturnType<typeof spawn>, name: string): Promise<void> {
