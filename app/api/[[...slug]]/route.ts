@@ -44,18 +44,22 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   }
 
   if (route === 'whitelist') {
-    const limit  = Number(searchParams.get('limit')  ?? 20);
-    const offset = Number(searchParams.get('offset') ?? 0);
-    const search = searchParams.get('search') ?? undefined;
-    const [rows, total] = await Promise.all([getWhitelist(limit, offset, search), getWhitelistCount(search)]);
+    const limit     = Number(searchParams.get('limit')  ?? 20);
+    const offset    = Number(searchParams.get('offset') ?? 0);
+    const search    = searchParams.get('search')    ?? undefined;
+    const startDate = searchParams.get('startDate') ?? undefined;
+    const endDate   = searchParams.get('endDate')   ?? undefined;
+    const [rows, total] = await Promise.all([getWhitelist(limit, offset, search, startDate, endDate), getWhitelistCount(search, startDate, endDate)]);
     return json({ rows, total });
   }
 
   if (route === 'blacklist') {
-    const limit  = Number(searchParams.get('limit')  ?? 20);
-    const offset = Number(searchParams.get('offset') ?? 0);
-    const search = searchParams.get('search') ?? undefined;
-    const [rows, total] = await Promise.all([getBlacklist(limit, offset, search), getBlacklistCount(search)]);
+    const limit     = Number(searchParams.get('limit')  ?? 20);
+    const offset    = Number(searchParams.get('offset') ?? 0);
+    const search    = searchParams.get('search')    ?? undefined;
+    const startDate = searchParams.get('startDate') ?? undefined;
+    const endDate   = searchParams.get('endDate')   ?? undefined;
+    const [rows, total] = await Promise.all([getBlacklist(limit, offset, search, startDate, endDate), getBlacklistCount(search, startDate, endDate)]);
     return json({ rows, total });
   }
 

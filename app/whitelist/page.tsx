@@ -10,22 +10,24 @@ import type { ListEntry } from '@/lib/contract';
 const PAGE_SIZE_OPTIONS = ['10', '20', '50', '100'];
 
 export default function WhitelistPage() {
-  const [rows, setRows]         = useState<ListEntry[]>([]);
-  const [total, setTotal]       = useState(0);
-  const [search, setSearch]     = useState('');
-  const [debouncedSearch]       = useDebouncedValue(search, 300);
-  const [page, setPage]         = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [rows, setRows]           = useState<ListEntry[]>([]);
+  const [total, setTotal]         = useState(0);
+  const [search, setSearch]       = useState('');
+  const [debouncedSearch]         = useDebouncedValue(search, 300);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate]     = useState('');
+  const [page, setPage]           = useState(1);
+  const [pageSize, setPageSize]   = useState(20);
   const [opened, { open, close }] = useDisclosure(false);
   const [editEntry, setEditEntry] = useState<ListEntry | null>(null);
 
   const load = () =>
-    apiClient.whitelist.list({ limit: pageSize, offset: (page - 1) * pageSize, search: debouncedSearch || undefined })
+    apiClient.whitelist.list({ limit: pageSize, offset: (page - 1) * pageSize, search: debouncedSearch || undefined, startDate: startDate || undefined, endDate: endDate || undefined })
       .then(d => { setRows(d.rows); setTotal(d.total); });
 
   useEffect(() => {
     load();
-  }, [page, pageSize, debouncedSearch]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [page, pageSize, debouncedSearch, startDate, endDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const remove = async (phoneNo: string) => {
     await apiClient.whitelist.remove({ phoneNo });
@@ -46,12 +48,30 @@ export default function WhitelistPage() {
       </Text>
 
       <Card shadow="sm" padding="md" radius="md" withBorder>
-        <TextInput
-          label="Search"
-          placeholder="Name or number..."
-          value={search}
-          onChange={e => { setSearch(e.target.value); setPage(1); }}
-        />
+        <Group gap="sm" align="flex-end" wrap="wrap">
+          <TextInput
+            label="Search"
+            placeholder="Name or number..."
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
+            style={{ flex: 1, minWidth: 160 }}
+          />
+          <TextInput
+            label="From date"
+            type="date"
+            value={startDate}
+            onChange={e => { setStartDate(e.currentTarget.value); setPage(1); }}
+          />
+          <TextInput
+            label="To date"
+            type="date"
+            value={endDate}
+            onChange={e => { setEndDate(e.currentTarget.value); setPage(1); }}
+          />
+          <Button variant="subtle" onClick={() => { setStartDate(''); setEndDate(''); setPage(1); }}>
+            Clear dates
+          </Button>
+        </Group>
       </Card>
 
       <Group justify="space-between" align="center">

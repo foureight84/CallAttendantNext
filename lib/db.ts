@@ -158,20 +158,26 @@ export async function getCallTrend(days = 7): Promise<{ date: string; total: num
 // --- Whitelist / Blacklist ---
 export type ListRow = typeof whitelist.$inferSelect;
 
-export async function getWhitelist(limit = 20, offset = 0, search?: string): Promise<ListRow[]> {
-  const condition = search
-    ? sql`lower(${whitelist.phoneNo}) LIKE ${'%' + search.toLowerCase().replace(/[%_\\]/g, '') + '%'}
-       OR lower(coalesce(${whitelist.name}, '')) LIKE ${'%' + search.toLowerCase().replace(/[%_\\]/g, '') + '%'}`
-    : undefined;
-  return db.select().from(whitelist).where(condition).orderBy(whitelist.phoneNo).limit(limit).offset(offset);
+function buildListConditions(table: typeof whitelist | typeof blacklist, search?: string, startDate?: string, endDate?: string) {
+  const conditions = [];
+  if (search) {
+    const pattern = '%' + search.toLowerCase().replace(/[%_\\]/g, '') + '%';
+    conditions.push(sql`(lower(${table.phoneNo}) LIKE ${pattern} OR lower(coalesce(${table.name}, '')) LIKE ${pattern})`);
+  }
+  if (startDate) conditions.push(gte(table.systemDateTime, startDate));
+  if (endDate)   conditions.push(lte(table.systemDateTime, endDate + 'T23:59:59.999Z'));
+  return conditions.length ? and(...conditions) : undefined;
 }
 
-export async function getWhitelistCount(search?: string): Promise<number> {
-  const condition = search
-    ? sql`lower(${whitelist.phoneNo}) LIKE ${'%' + search.toLowerCase().replace(/[%_\\]/g, '') + '%'}
-       OR lower(coalesce(${whitelist.name}, '')) LIKE ${'%' + search.toLowerCase().replace(/[%_\\]/g, '') + '%'}`
-    : undefined;
-  const [row] = await db.select({ count: drizzleCount() }).from(whitelist).where(condition);
+export async function getWhitelist(limit = 20, offset = 0, search?: string, startDate?: string, endDate?: string): Promise<ListRow[]> {
+  return db.select().from(whitelist)
+    .where(buildListConditions(whitelist, search, startDate, endDate))
+    .orderBy(whitelist.phoneNo).limit(limit).offset(offset);
+}
+
+export async function getWhitelistCount(search?: string, startDate?: string, endDate?: string): Promise<number> {
+  const [row] = await db.select({ count: drizzleCount() }).from(whitelist)
+    .where(buildListConditions(whitelist, search, startDate, endDate));
   return row?.count ?? 0;
 }
 
@@ -196,20 +202,15 @@ export async function isWhitelisted(phoneNo: string): Promise<ListRow | undefine
   return wildcards.find(w => wildcardMatch(w.phoneNo, phoneNo));
 }
 
-export async function getBlacklist(limit = 20, offset = 0, search?: string): Promise<ListRow[]> {
-  const condition = search
-    ? sql`lower(${blacklist.phoneNo}) LIKE ${'%' + search.toLowerCase().replace(/[%_\\]/g, '') + '%'}
-       OR lower(coalesce(${blacklist.name}, '')) LIKE ${'%' + search.toLowerCase().replace(/[%_\\]/g, '') + '%'}`
-    : undefined;
-  return db.select().from(blacklist).where(condition).orderBy(blacklist.phoneNo).limit(limit).offset(offset);
+export async function getBlacklist(limit = 20, offset = 0, search?: string, startDate?: string, endDate?: string): Promise<ListRow[]> {
+  return db.select().from(blacklist)
+    .where(buildListConditions(blacklist, search, startDate, endDate))
+    .orderBy(blacklist.phoneNo).limit(limit).offset(offset);
 }
 
-export async function getBlacklistCount(search?: string): Promise<number> {
-  const condition = search
-    ? sql`lower(${blacklist.phoneNo}) LIKE ${'%' + search.toLowerCase().replace(/[%_\\]/g, '') + '%'}
-       OR lower(coalesce(${blacklist.name}, '')) LIKE ${'%' + search.toLowerCase().replace(/[%_\\]/g, '') + '%'}`
-    : undefined;
-  const [row] = await db.select({ count: drizzleCount() }).from(blacklist).where(condition);
+export async function getBlacklistCount(search?: string, startDate?: string, endDate?: string): Promise<number> {
+  const [row] = await db.select({ count: drizzleCount() }).from(blacklist)
+    .where(buildListConditions(blacklist, search, startDate, endDate));
   return row?.count ?? 0;
 }
 

@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Stack, Title, Table, Button, Group, Text, TextInput, Select, Pagination, Card } from '@mantine/core';
-import { useDebouncedValue } from '@mantine/hooks';
-import { useDisclosure } from '@mantine/hooks';
+import { useDebouncedValue, useDisclosure } from '@mantine/hooks';
 import { AddToListModal } from '@/components/AddToListModal';
 import { apiClient } from '@/lib/api-client';
 import type { ListEntry, AppSettings } from '@/lib/contract';
@@ -24,23 +23,25 @@ function blocklistActionDescription(settings: AppSettings | null): string {
 }
 
 export default function BlacklistPage() {
-  const [rows, setRows]       = useState<ListEntry[]>([]);
-  const [total, setTotal]     = useState(0);
-  const [search, setSearch]   = useState('');
-  const [debouncedSearch]     = useDebouncedValue(search, 300);
-  const [page, setPage]       = useState(1);
-  const [pageSize, setPageSize] = useState(20);
-  const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [rows, setRows]         = useState<ListEntry[]>([]);
+  const [total, setTotal]       = useState(0);
+  const [search, setSearch]     = useState('');
+  const [debouncedSearch]       = useDebouncedValue(search, 300);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate]     = useState('');
+  const [page, setPage]           = useState(1);
+  const [pageSize, setPageSize]   = useState(20);
+  const [settings, setSettings]   = useState<AppSettings | null>(null);
   const [opened, { open, close }] = useDisclosure(false);
   const [editEntry, setEditEntry] = useState<ListEntry | null>(null);
 
   const load = () =>
-    apiClient.blacklist.list({ limit: pageSize, offset: (page - 1) * pageSize, search: debouncedSearch || undefined })
+    apiClient.blacklist.list({ limit: pageSize, offset: (page - 1) * pageSize, search: debouncedSearch || undefined, startDate: startDate || undefined, endDate: endDate || undefined })
       .then(d => { setRows(d.rows); setTotal(d.total); });
 
   useEffect(() => {
     load();
-  }, [page, pageSize, debouncedSearch]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [page, pageSize, debouncedSearch, startDate, endDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     apiClient.settings.get().then(setSettings).catch(() => {});
@@ -70,12 +71,30 @@ export default function BlacklistPage() {
       )}
 
       <Card shadow="sm" padding="md" radius="md" withBorder>
-        <TextInput
-          label="Search"
-          placeholder="Name or number..."
-          value={search}
-          onChange={e => { setSearch(e.target.value); setPage(1); }}
-        />
+        <Group gap="sm" align="flex-end" wrap="wrap">
+          <TextInput
+            label="Search"
+            placeholder="Name or number..."
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
+            style={{ flex: 1, minWidth: 160 }}
+          />
+          <TextInput
+            label="From date"
+            type="date"
+            value={startDate}
+            onChange={e => { setStartDate(e.currentTarget.value); setPage(1); }}
+          />
+          <TextInput
+            label="To date"
+            type="date"
+            value={endDate}
+            onChange={e => { setEndDate(e.currentTarget.value); setPage(1); }}
+          />
+          <Button variant="subtle" onClick={() => { setStartDate(''); setEndDate(''); setPage(1); }}>
+            Clear dates
+          </Button>
+        </Group>
       </Card>
 
       <Group justify="space-between" align="center">

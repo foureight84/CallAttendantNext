@@ -33,22 +33,26 @@ export const apiClient = {
       apiFetch<{ callers: { number: string; name: string | null; count: number }[]; blocked: { number: string; name: string | null; count: number }[] }>('/api/calls/top'),
   },
   whitelist: {
-    list: (query: { limit?: number; offset?: number; search?: string } = {}) => {
+    list: (query: { limit?: number; offset?: number; search?: string; startDate?: string; endDate?: string } = {}) => {
       const params = new URLSearchParams();
-      if (query.limit  != null) params.set('limit',  String(query.limit));
-      if (query.offset != null) params.set('offset', String(query.offset));
-      if (query.search)         params.set('search', query.search);
+      if (query.limit     != null) params.set('limit',     String(query.limit));
+      if (query.offset    != null) params.set('offset',    String(query.offset));
+      if (query.search)            params.set('search',    query.search);
+      if (query.startDate)         params.set('startDate', query.startDate);
+      if (query.endDate)           params.set('endDate',   query.endDate);
       return apiFetch<{ rows: ListEntry[]; total: number }>(`/api/whitelist?${params}`);
     },
     add:    (body: { phoneNo: string; name?: string; reason?: string }) => apiFetch<{ ok: true }>('/api/whitelist', { method: 'POST',   ...jsonBody(body) }),
     remove: (body: { phoneNo: string })                                 => apiFetch<{ ok: true }>('/api/whitelist', { method: 'DELETE', ...jsonBody(body) }),
   },
   blacklist: {
-    list: (query: { limit?: number; offset?: number; search?: string } = {}) => {
+    list: (query: { limit?: number; offset?: number; search?: string; startDate?: string; endDate?: string } = {}) => {
       const params = new URLSearchParams();
-      if (query.limit  != null) params.set('limit',  String(query.limit));
-      if (query.offset != null) params.set('offset', String(query.offset));
-      if (query.search)         params.set('search', query.search);
+      if (query.limit     != null) params.set('limit',     String(query.limit));
+      if (query.offset    != null) params.set('offset',    String(query.offset));
+      if (query.search)            params.set('search',    query.search);
+      if (query.startDate)         params.set('startDate', query.startDate);
+      if (query.endDate)           params.set('endDate',   query.endDate);
       return apiFetch<{ rows: ListEntry[]; total: number }>(`/api/blacklist?${params}`);
     },
     add:    (body: { phoneNo: string; name?: string; reason?: string }) => apiFetch<{ ok: true }>('/api/blacklist', { method: 'POST',   ...jsonBody(body) }),
