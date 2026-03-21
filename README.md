@@ -141,7 +141,7 @@ The app will be available at `http://localhost:3000`.
 
 - The Dockerfile downloads the piper binary automatically during build
 - Mount your modem device via `devices` in `docker-compose.yml` (already configured for `/dev/ttyUSB0`)
-- The database and messages directory are persisted via volume mounts
+- The database (`./data/callattendant.db`) and messages directory (`./messages`) are persisted via bind mounts — Docker creates these directories automatically on first start
 - Pass all config via environment variables in `docker-compose.yml` — no `.env` file is loaded inside the container
 
 ### Rebuild after code changes
@@ -293,7 +293,7 @@ All historical call log entries, whitelist/blocklist entries, and voicemail reco
 |------|---------|-------------|
 | `--old-db` | *(required)* | Path to the Python app's `callattendant.db` |
 | `--old-messages` | *(optional)* | Path to the Python app's `messages/` directory |
-| `--new-db` | `./callattendant.db` | Path to the new app's database |
+| `--new-db` | `./callattendant.db` | Path to the new app's database (Docker: `./data/callattendant.db`) |
 | `--new-messages` | `./messages` | Path to the new app's messages directory |
 | `--dry-run` | — | Read and count everything; write nothing |
 
@@ -303,7 +303,7 @@ The script is safe to re-run — it uses `INSERT OR IGNORE` for all rows and ski
 
 ### Running the migration when both apps are in Docker
 
-The new app's database and messages directory are bind-mounted to the host (`./callattendant.db` and `./messages` next to `docker-compose.yml`), so the migration script can reach them directly.
+The new app's database and messages directory are bind-mounted to the host (`./data/` and `./messages/` next to `docker-compose.yml`), so the migration script can reach them directly.
 
 **Step 1 — Stop the new app**
 
@@ -339,13 +339,13 @@ Use the already-built callattendantnext image so Node.js and all dependencies ar
 docker run --rm \
   -v /tmp/old-callattendant.db:/old/callattendant.db:ro \
   -v /tmp/old-messages:/old/messages:ro \
-  -v ./callattendant.db:/app/callattendant.db \
+  -v ./data:/app/data \
   -v ./messages:/app/messages \
   callattendantnext-callattendant \
   node_modules/.bin/tsx scripts/migrate-from-python.ts \
     --old-db /old/callattendant.db \
     --old-messages /old/messages \
-    --new-db /app/callattendant.db \
+    --new-db /app/data/callattendant.db \
     --new-messages /app/messages \
     --dry-run
 ```
@@ -355,13 +355,13 @@ docker run --rm \
 docker run --rm \
   -v /tmp/old-callattendant.db:/old/callattendant.db:ro \
   -v /tmp/old-messages:/old/messages:ro \
-  -v ./callattendant.db:/app/callattendant.db \
+  -v ./data:/app/data \
   -v ./messages:/app/messages \
   callattendantnext-callattendant \
   node_modules/.bin/tsx scripts/migrate-from-python.ts \
     --old-db /old/callattendant.db \
     --old-messages /old/messages \
-    --new-db /app/callattendant.db \
+    --new-db /app/data/callattendant.db \
     --new-messages /app/messages
 ```
 

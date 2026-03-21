@@ -7,13 +7,13 @@ services:
       - "/dev/ttyUSB0:/dev/ttyUSB0"
     volumes:
       - ./messages:/app/messages
-      - ./callattendant.db:/app/callattendant.db
+      - ./data:/app/data
       - ./piper-models:/app/piper-models
       - ./logs:/app/logs
     environment:
       - SERIAL_PORT=/dev/ttyUSB0
       - SERIAL_BAUD_RATE=57600
-      - DB_PATH=/app/callattendant.db
+      - DB_PATH=/app/data/callattendant.db
       - MESSAGES_DIR=/app/messages
       - SCREENING_MODE=whitelist,blacklist
       - BLOCK_SERVICE=NOMOROBO
