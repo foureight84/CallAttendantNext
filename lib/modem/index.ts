@@ -240,7 +240,7 @@ async function handlePermittedCall(callLogId: number): Promise<void> {
   const ringsLeft = settings.ringsBeforeVm - ringCount;
   modemLog('info', `Permitted caller — waiting ${ringsLeft} more ring(s) before voicemail`);
   await waitForRings(ringsLeft);
-  await goToVoicemail(callLogId, 'general_greeting', settings.greetingVoice);
+  await goToVoicemail(callLogId, 'general_greeting', settings.greetingVoice, settings.greetingLengthScale);
   await blinkLed(GPIO_PINS.ALLOWED, 1);
 }
 
@@ -250,7 +250,7 @@ async function handleScreenedCall(callLogId: number, currentRing: number, immedi
   const ringsLeft = immediate ? 0 : Math.max(0, settings.ringsBeforeVmScreened - currentRing);
   modemLog('info', `Screened caller — answering after ${ringsLeft} more ring(s)`);
   await waitForRings(ringsLeft);
-  await goToVoicemail(callLogId, 'general_greeting', settings.greetingVoice);
+  await goToVoicemail(callLogId, 'general_greeting', settings.greetingVoice, settings.greetingLengthScale);
 }
 
 function resolveModelPath(modelFilename: string): string {
