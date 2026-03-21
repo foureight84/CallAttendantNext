@@ -150,16 +150,25 @@ console.log(`  ${counts.blacklist.read} read, ${counts.blacklist.inserted} inser
 
 // --- Helpers ---
 
+const MONTH_MAP: Record<string, string> = {
+  Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06',
+  Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12',
+};
+
 /**
- * Converts a Python callattendant Date value (MM-DD) to our format (MM/DD/YYYY).
- * Uses the year from the accompanying SystemDateTime (ISO-like string).
+ * Converts a Python callattendant Date value (DD-Mon, e.g. "16-Mar") to our
+ * format (MM/DD/YYYY). Uses the year from the accompanying SystemDateTime.
  * Returns the value unchanged if it doesn't match the old pattern.
  */
 function normalizeDate(date: string | null, systemDateTime: string | null): string | null {
-  if (!date || !/^\d{2}-\d{2}$/.test(date)) return date;
+  if (!date) return date;
+  const match = date.match(/^(\d{2})-([A-Za-z]{3})$/);
+  if (!match) return date;
   const year = systemDateTime?.slice(0, 4);
   if (!year || !/^\d{4}$/.test(year)) return date;
-  const [mm, dd] = date.split('-');
+  const dd = match[1];
+  const mm = MONTH_MAP[match[2]!] ?? MONTH_MAP[match[2]!.charAt(0).toUpperCase() + match[2]!.slice(1).toLowerCase()];
+  if (!mm) return date;
   return `${mm}/${dd}/${year}`;
 }
 
