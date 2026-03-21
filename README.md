@@ -234,6 +234,149 @@ Set `ENABLE_GPIO=true` in `.env` to enable LED indicators on GPIO pins (requires
 
 ---
 
+## Migrating from the Python callattendant
+
+If you have an existing [callattendant](https://github.com/emxsys/callattendant) Python installation, use the included migration script to import your call log, whitelist, blocklist, and voicemail recordings.
+
+The schema is identical between both apps — migration is a direct copy. Voicemail WAV files are copied as-is and served without conversion.
+
+### 1. Stop the new app (if running)
+
+```bash
+# systemd
+sudo systemctl stop callattendant
+
+# or just Ctrl-C if running in the foreground
+```
+
+### 2. Dry run — verify counts before committing
+
+```bash
+npx tsx scripts/migrate-from-python.ts \
+  --old-db /path/to/callattendant/callattendant.db \
+  --old-messages /path/to/callattendant/messages \
+  --dry-run
+```
+
+Check that the row counts look correct before proceeding.
+
+### 3. Run the migration
+
+```bash
+npx tsx scripts/migrate-from-python.ts \
+  --old-db /path/to/callattendant/callattendant.db \
+  --old-messages /path/to/callattendant/messages
+```
+
+The script will print a summary when done:
+
+```
+Whitelist : 12 / 12 rows
+Blacklist : 47 / 47 rows
+CallLog   : 1842 / 1842 rows
+Message   : 38 / 38 rows
+Files     : 38 copied, 0 already present
+Done.
+```
+
+### 4. Start the new app
+
+```bash
+npm start
+```
+
+All historical call log entries, whitelist/blocklist entries, and voicemail recordings will be present.
+
+### Options
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--old-db` | *(required)* | Path to the Python app's `callattendant.db` |
+| `--old-messages` | *(optional)* | Path to the Python app's `messages/` directory |
+| `--new-db` | `./callattendant.db` | Path to the new app's database |
+| `--new-messages` | `./messages` | Path to the new app's messages directory |
+| `--dry-run` | — | Read and count everything; write nothing |
+
+The script is safe to re-run — it uses `INSERT OR IGNORE` for all rows and skips files that already exist in the destination.
+
+> **Note:** Settings are not migrated. The Python app has no Settings table; the new app seeds settings from your `.env` on first startup.
+
+### Running the migration when both apps are in Docker
+
+The new app's database and messages directory are bind-mounted to the host (`./callattendant.db` and `./messages` next to `docker-compose.yml`), so the migration script can reach them directly.
+
+**Step 1 — Stop the new app**
+
+```bash
+docker compose down
+```
+
+**Step 2 — Get the old database and messages onto the host**
+
+If the old Python callattendant also uses bind mounts, the files are already on the host — note their paths and skip to step 3.
+
+If the old app uses named Docker volumes, copy the files out first:
+
+```bash
+# Find the old container name
+docker ps -a
+
+# Copy the database
+docker cp <old-container>:/app/callattendant.db /tmp/old-callattendant.db
+
+# Copy the messages directory
+docker cp <old-container>:/app/messages /tmp/old-messages
+```
+
+Adjust `/app/callattendant.db` and `/app/messages` to match the actual paths inside the old container if they differ.
+
+**Step 3 — Run the migration inside a one-off container**
+
+Use the already-built callattendantnext image so Node.js and all dependencies are available — no need to install anything on the host:
+
+```bash
+# Dry run first
+docker run --rm \
+  -v /tmp/old-callattendant.db:/old/callattendant.db:ro \
+  -v /tmp/old-messages:/old/messages:ro \
+  -v ./callattendant.db:/app/callattendant.db \
+  -v ./messages:/app/messages \
+  callattendantnext-callattendant \
+  node_modules/.bin/tsx scripts/migrate-from-python.ts \
+    --old-db /old/callattendant.db \
+    --old-messages /old/messages \
+    --new-db /app/callattendant.db \
+    --new-messages /app/messages \
+    --dry-run
+```
+
+```bash
+# Run for real (remove --dry-run)
+docker run --rm \
+  -v /tmp/old-callattendant.db:/old/callattendant.db:ro \
+  -v /tmp/old-messages:/old/messages:ro \
+  -v ./callattendant.db:/app/callattendant.db \
+  -v ./messages:/app/messages \
+  callattendantnext-callattendant \
+  node_modules/.bin/tsx scripts/migrate-from-python.ts \
+    --old-db /old/callattendant.db \
+    --old-messages /old/messages \
+    --new-db /app/callattendant.db \
+    --new-messages /app/messages
+```
+
+The image name (`callattendantnext-callattendant`) is the default Docker Compose generates from the project directory name and service name. If yours differs, check with `docker images`.
+
+If the old app's files are already bind-mounted on the host (e.g. at `./old-messages`), pass the host paths directly — no `docker cp` step needed.
+
+**Step 4 — Start the new app**
+
+```bash
+docker compose up -d
+```
+
+---
+
 ## Greeting Scripts
 
 Greeting text files live in `public/audio/script/`. Edit them to customize what is spoken. **Do not rename these files** — the filenames are hardcoded and the application will not find them if changed.
