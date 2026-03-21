@@ -17,11 +17,18 @@ export async function ensureMessagesDir(): Promise<void> {
  * Convert raw PCM buffer (8-bit unsigned, 8kHz, mono) to MP3 using ffmpeg.
  * Returns the output MP3 filename (basename only).
  */
-export async function savePcmAsMP3(pcmBuffer: Buffer, callLogId: number): Promise<string> {
+export async function savePcmAsMP3(pcmBuffer: Buffer, callLogId: number, number: string, name: string): Promise<string> {
   await ensureMessagesDir();
   const trimmed = trimTrailingSilence(pcmBuffer);
-  const timestamp = Date.now();
-  const baseName = `msg_${callLogId}_${timestamp}`;
+  const now = new Date();
+  const mm  = String(now.getMonth() + 1).padStart(2, '0');
+  const dd  = String(now.getDate()).padStart(2, '0');
+  const yy  = String(now.getFullYear()).slice(-2);
+  const hh  = String(now.getHours()).padStart(2, '0');
+  const min = String(now.getMinutes()).padStart(2, '0');
+  const timestamp = `${mm}${dd}${yy}_${hh}${min}`;
+  const safeName = name.replace(/[/\\:*?"<>|]/g, '').replace(/\s+/g, '_').trim() || 'UNKNOWN';
+  const baseName = `${callLogId}_${number}_${safeName}_${timestamp}`;
 
   try {
     const pcmPath = path.join(config.messagesDir, `${baseName}.pcm`);

@@ -188,15 +188,15 @@ async function handleRing(): Promise<void> {
   callEvents.emit('incoming-call', { callLogId, name: resolvedName, number, date, time, action: screening.action, reason: screening.reason });
 
   if (screening.action === 'Blocked') {
-    await handleBlockedCall(callLogId, ringCount);
+    await handleBlockedCall(callLogId, ringCount, name, number);
   } else if (screening.action === 'Permitted') {
-    await handlePermittedCall(callLogId);
+    await handlePermittedCall(callLogId, name, number);
   } else {
-    await handleScreenedCall(callLogId, ringCount, screening.immediate);
+    await handleScreenedCall(callLogId, ringCount, name, number, screening.immediate);
   }
 }
 
-async function handleBlockedCall(callLogId: number, currentRing: number): Promise<void> {
+async function handleBlockedCall(callLogId: number, currentRing: number, name: string, number: string): Promise<void> {
   const modem = globalThis.__modemInstance;
   if (!modem) return;
   const settings = await getSettings();
@@ -206,7 +206,7 @@ async function handleBlockedCall(callLogId: number, currentRing: number): Promis
     const ringsLeft = Math.max(0, settings.ringsBeforeVmBlocklist - currentRing);
     modemLog('info', `Blocked caller — sending to voicemail after ${ringsLeft} more ring(s)`);
     await waitForRings(ringsLeft);
-    await goToVoicemail(callLogId, 'general_greeting', settings.greetingVoice, settings.greetingLengthScale);
+    await goToVoicemail(callLogId, 'general_greeting', settings.greetingVoice, settings.greetingLengthScale, name, number);
     await blinkLed(GPIO_PINS.BLOCKED, 1);
     return;
   }
@@ -234,30 +234,30 @@ async function handleBlockedCall(callLogId: number, currentRing: number): Promis
   resetCallState();
 }
 
-async function handlePermittedCall(callLogId: number): Promise<void> {
+async function handlePermittedCall(callLogId: number, name: string, number: string): Promise<void> {
   if (!globalThis.__modemInstance) return;
   const settings = await getSettings();
   const ringsLeft = settings.ringsBeforeVm - ringCount;
   modemLog('info', `Permitted caller — waiting ${ringsLeft} more ring(s) before voicemail`);
   await waitForRings(ringsLeft);
-  await goToVoicemail(callLogId, 'general_greeting', settings.greetingVoice, settings.greetingLengthScale);
+  await goToVoicemail(callLogId, 'general_greeting', settings.greetingVoice, settings.greetingLengthScale, name, number);
   await blinkLed(GPIO_PINS.ALLOWED, 1);
 }
 
-async function handleScreenedCall(callLogId: number, currentRing: number, immediate = false): Promise<void> {
+async function handleScreenedCall(callLogId: number, currentRing: number, name: string, number: string, immediate = false): Promise<void> {
   if (!globalThis.__modemInstance) return;
   const settings = await getSettings();
   const ringsLeft = immediate ? 0 : Math.max(0, settings.ringsBeforeVmScreened - currentRing);
   modemLog('info', `Screened caller — answering after ${ringsLeft} more ring(s)`);
   await waitForRings(ringsLeft);
-  await goToVoicemail(callLogId, 'general_greeting', settings.greetingVoice, settings.greetingLengthScale);
+  await goToVoicemail(callLogId, 'general_greeting', settings.greetingVoice, settings.greetingLengthScale, name, number);
 }
 
 function resolveModelPath(modelFilename: string): string {
   return path.join(path.resolve(config.piperModelsDir), modelFilename);
 }
 
-async function goToVoicemail(callLogId: number, greetingBasename: string, voice: string, lengthScale: number): Promise<void> {
+async function goToVoicemail(callLogId: number, greetingBasename: string, voice: string, lengthScale: number, name: string, number: string): Promise<void> {
   const modem = globalThis.__modemInstance;
   if (!modem) return;
 
@@ -307,7 +307,7 @@ async function goToVoicemail(callLogId: number, greetingBasename: string, voice:
 
   if (pcmData.length > 1000) {
     try {
-      const filename = await savePcmAsMP3(pcmData, callLogId);
+      const filename = await savePcmAsMP3(pcmData, callLogId, number, name);
       await insertMessage({ CallLogID: callLogId, Played: 0, Filename: filename, DateTime: new Date().toISOString() });
       modemLog('info', `Voicemail saved: ${filename}`);
       callEvents.emit('new-voicemail', { callLogId, filename });

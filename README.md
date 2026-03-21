@@ -29,7 +29,7 @@ If you have a hardware modem not on this list and would like support added, open
 - **Non-blocking call handling** — async/await throughout, no blocking main thread
 - **Easier debugging** — structured log events streamed to the browser via SSE; Debug Console page
 - **Piper TTS instead of WAV files** — greetings are synthesized on demand from `.txt` scripts; no per-voice audio files to manage
-- **ffmpeg voicemail encoding** — recordings saved as MP3 (falls back to WAV if ffmpeg is unavailable)
+- **ffmpeg voicemail encoding** — recordings saved as MP3 (falls back to WAV if ffmpeg is unavailable); filenames match the Python pattern: `{callLogId}_{number}_{name}_{MMDDyy_HHMM}.mp3` (e.g. `42_8005551234_JOHN_SMITH_032621_1423.mp3`)
 - **Updated Nomorobo scraping** — adapted for their current website format
 - **Improved serial port handling** — faster modem detection, reduced call response time
 - **Raspberry Pi GPIO LED support** — toggle via `ENABLE_GPIO=true` in `.env`
