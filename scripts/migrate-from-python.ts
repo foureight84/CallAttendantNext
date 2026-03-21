@@ -148,6 +148,21 @@ try {
 }
 console.log(`  ${counts.blacklist.read} read, ${counts.blacklist.inserted} inserted`);
 
+// --- Helpers ---
+
+/**
+ * Converts a Python callattendant Date value (MM-DD) to our format (MM/DD/YYYY).
+ * Uses the year from the accompanying SystemDateTime (ISO-like string).
+ * Returns the value unchanged if it doesn't match the old pattern.
+ */
+function normalizeDate(date: string | null, systemDateTime: string | null): string | null {
+  if (!date || !/^\d{2}-\d{2}$/.test(date)) return date;
+  const year = systemDateTime?.slice(0, 4);
+  if (!year || !/^\d{4}$/.test(year)) return date;
+  const [mm, dd] = date.split('-');
+  return `${mm}/${dd}/${year}`;
+}
+
 // --- Migrate CallLog ---
 // We need to map old CallLogID → new CallLogID for the Message foreign keys.
 const callLogIdMap = new Map<number, number>();
@@ -160,6 +175,7 @@ try {
   counts.callLog.read = rows.rows.length;
   for (const row of rows.rows) {
     const oldId = row[0] as number;
+    const date  = normalizeDate(row[3] as string | null, row[5] as string | null);
     if (!dryRun && newDb) {
       try {
         // Check if a row with this CallLogID already exists
@@ -175,7 +191,7 @@ try {
           await newDb.execute({
             sql: `INSERT OR IGNORE INTO CallLog (CallLogID, Name, Number, Date, Time, SystemDateTime, Action, Reason)
                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            args: [oldId, row[1] ?? null, row[2] ?? null, row[3] ?? null, row[4] ?? null, row[5] ?? null, row[6] ?? null, row[7] ?? null],
+            args: [oldId, row[1] ?? null, row[2] ?? null, date, row[4] ?? null, row[5] ?? null, row[6] ?? null, row[7] ?? null],
           });
           callLogIdMap.set(oldId, oldId);
           counts.callLog.inserted++;
