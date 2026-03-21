@@ -12,7 +12,7 @@ services:
       - ./logs:/app/logs
     environment:
       - SERIAL_PORT=/dev/ttyUSB0
-      - SERIAL_BAUD_RATE=57600
+      - SERIAL_BAUD_RATE=115200
       - DB_PATH=/app/data/callattendant.db
       - MESSAGES_DIR=/app/messages
       - SCREENING_MODE=whitelist,blacklist

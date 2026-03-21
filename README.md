@@ -6,11 +6,11 @@ A TypeScript/Next.js port of the [callattendant](https://github.com/emxsys/calla
 
 **Only hardware modems are supported.** Software modems (winmodems) will not work as they lack the voice mode capabilities required for call screening and audio playback.
 
-| Modem |
-|-------|
-| US Robotics USR5637 |
-| MultiTech MT9234MU-CDC |
-| ZOOM 3095 |
+| Modem | Recommended Baud Rate |
+|-------|-----------------------|
+| US Robotics USR5637 | 57600 |
+| MultiTech MT9234MU-CDC | 115200 — provides best voice quality |
+| ZOOM 3095 | 115200 — provides best voice quality |
 
 If you have a hardware modem not on this list and would like support added, open an issue at [foureight84/CallAttendantNext](https://github.com/foureight84/CallAttendantNext).
 
@@ -54,7 +54,7 @@ cp .env.example .env
 | Key | Description |
 |-----|-------------|
 | `SERIAL_PORT` | Path to your modem device (e.g. `/dev/ttyUSB0`, `/dev/tty.usbmodem*`, `COM3`) |
-| `SERIAL_BAUD_RATE` | Modem baud rate — keep at `57600` unless your modem supports higher |
+| `SERIAL_BAUD_RATE` | Modem baud rate — `115200` for ZOOM 3095 and MultiTech MT9234MU-CDC (best voice quality); `57600` for US Robotics USR5637 |
 
 All other keys are optional and fall back to sensible defaults.
 

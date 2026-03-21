@@ -19,10 +19,25 @@ declare global {
 }
 globalThis.__modemInstance ??= null;
 
+const RING_INTERVAL_MS = 6000;
+const RING_TIMEOUT_BUFFER_MS = 2000;
+
 let ringCount = 0;
 let currentCallInfo: CallerIdInfo | null = null;
 let isHandlingCall = false;
 let screeningPromise: Promise<{ action: 'Blocked' | 'Permitted' | 'Screened'; reason: string }> | null = null;
+let ringTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleRingTimeout(): void {
+  if (ringTimeoutId !== null) clearTimeout(ringTimeoutId);
+  ringTimeoutId = setTimeout(() => {
+    ringTimeoutId = null;
+    if (!isHandlingCall && ringCount > 0) {
+      modemLog('info', 'No additional ring received — caller likely hung up, resetting state');
+      resetCallState();
+    }
+  }, RING_INTERVAL_MS + RING_TIMEOUT_BUFFER_MS);
+}
 
 export function getModem(): Modem | null {
   return globalThis.__modemInstance;
@@ -133,6 +148,7 @@ async function handleRing(): Promise<void> {
 
   if (ringCount === 1) {
     blinkLed(GPIO_PINS.RING, 1).catch(() => {});
+    scheduleRingTimeout();
     // Caller ID normally arrives within ~2s after ring 1.
     // Poll up to 3.5s — if it arrives, process immediately (fast path).
     // If not, return and let ring 2 trigger as the fallback.
@@ -324,7 +340,7 @@ async function goToVoicemail(callLogId: number, greetingBasename: string, voice:
 }
 
 async function handleCallEnd(): Promise<void> {
-  if (isHandlingCall) {
+  if (isHandlingCall || ringCount > 0) {
     modemLog('info', 'Call ended');
     resetCallState();
   }
@@ -341,4 +357,8 @@ function resetCallState(): void {
   currentCallInfo = null;
   isHandlingCall = false;
   screeningPromise = null;
+  if (ringTimeoutId !== null) {
+    clearTimeout(ringTimeoutId);
+    ringTimeoutId = null;
+  }
 }
