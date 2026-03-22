@@ -41,11 +41,14 @@ const END_VOICE_TX: Record<ModemModel, Buffer> = {
   UNKNOWN:  Buffer.from([0x10, 0x03]),
 };
 
-// DTE→DCE: end voice receive  (<DLE>! or triple-DLE+! for Conexant)
+// DTE→DCE: end voice receive
+//   USR/UNKNOWN:  <DLE>!  (IS-101 compatible)
+//   CONEXANT:     <DLE><DLE><DLE>!  (triple-DLE required by Conexant)
+//   MT9234MU:     <DLE>I  (MultiTech manual specifies <DLE><I> = 0x49 to abort +VRX)
 const END_VOICE_RX: Record<ModemModel, Buffer> = {
   USR:      Buffer.from([0x10, 0x21]),
   CONEXANT: Buffer.from([0x10, 0x10, 0x10, 0x21]),
-  MT9234MU: Buffer.from([0x10, 0x21]),
+  MT9234MU: Buffer.from([0x10, 0x49]),
   UNKNOWN:  Buffer.from([0x10, 0x21]),
 };
 
@@ -57,11 +60,28 @@ const AUDIO_CHUNK_SLEEP: Record<ModemModel, number> = {
   UNKNOWN:  100,
 };
 
-// DCE→DTE: DLE-shielded status codes sent by modem during voice mode
-const DCE_END_VOICE_DATA = Buffer.from([0x10, 0x03]); // <DLE><ETX> — caller hung up
-const DCE_PHONE_OFF_HOOK = Buffer.from([0x10, 0x48]); // <DLE>H
-const DCE_BUSY_TONE      = Buffer.from([0x10, 0x62]); // <DLE>b
-const DCE_DIAL_TONE      = Buffer.from([0x10, 0x64]); // <DLE>d
+// DCE→DTE: DLE-shielded hang-up/termination codes (sourced from each modem's manual)
+//   <DLE><ETX> 0x03 — end of voice data        USR ✓  CONEXANT ✓  MT9234MU ✓
+//   <DLE>H     0x48 — line current detected     USR ✓  CONEXANT ✓  MT9234MU ✓
+//   <DLE>b     0x62 — busy tone                 USR ✓  CONEXANT ✓  MT9234MU ✓
+//   <DLE>d     0x64 — dial tone                 USR ✓  CONEXANT ✓  MT9234MU ✓
+//   <DLE>h     0x68 — line current break        USR ✓  CONEXANT ✓  MT9234MU ✓
+//   <DLE>l     0x6C — loop current interruption USR ✗  CONEXANT ✓  MT9234MU ✓
+const DCE_END_VOICE_DATA     = Buffer.from([0x10, 0x03]);
+const DCE_PHONE_OFF_HOOK     = Buffer.from([0x10, 0x48]);
+const DCE_BUSY_TONE          = Buffer.from([0x10, 0x62]);
+const DCE_DIAL_TONE          = Buffer.from([0x10, 0x64]);
+const DCE_LINE_CURRENT_BREAK = Buffer.from([0x10, 0x68]);
+const DCE_LOOP_CURRENT_INT   = Buffer.from([0x10, 0x6C]); // NOT sent by USR5637
+
+// Per-model hang-up sequences — only codes documented for that modem.
+// Using another modem's codes risks false positives from valid voice data bytes.
+const HANGUP_SEQS: Record<ModemModel, Buffer[]> = {
+  USR:      [DCE_END_VOICE_DATA, DCE_PHONE_OFF_HOOK, DCE_LINE_CURRENT_BREAK, DCE_BUSY_TONE, DCE_DIAL_TONE],
+  CONEXANT: [DCE_END_VOICE_DATA, DCE_PHONE_OFF_HOOK, DCE_LINE_CURRENT_BREAK, DCE_LOOP_CURRENT_INT, DCE_BUSY_TONE, DCE_DIAL_TONE],
+  MT9234MU: [DCE_END_VOICE_DATA, DCE_PHONE_OFF_HOOK, DCE_LINE_CURRENT_BREAK, DCE_LOOP_CURRENT_INT, DCE_BUSY_TONE, DCE_DIAL_TONE],
+  UNKNOWN:  [DCE_END_VOICE_DATA, DCE_PHONE_OFF_HOOK, DCE_LINE_CURRENT_BREAK, DCE_BUSY_TONE, DCE_DIAL_TONE],
+};
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -74,6 +94,7 @@ export class Modem {
   model: ModemModel = 'UNKNOWN';
 
   private inVoiceMode = false;
+  private isOffHook = false;   // true between answer() and hangUp()
   private voiceBuffer: Buffer[] = [];
   private textBuffer = '';
 
@@ -131,20 +152,16 @@ export class Modem {
   // ─── Data handler ─────────────────────────────────────────────────────────
 
   private handleData(chunk: Buffer): void {
+    const hangupSeqs = HANGUP_SEQS[this.model];
+
     if (this.inVoiceMode) {
-      // Check for modem status codes that signal end of recording
-      if (chunk.includes(DCE_END_VOICE_DATA[0]) ) {
-        // Look for <DLE><ETX>, <DLE>H, <DLE>b, <DLE>d
-        if (chunk.indexOf(DCE_END_VOICE_DATA) !== -1 ||
-            chunk.indexOf(DCE_PHONE_OFF_HOOK)  !== -1 ||
-            chunk.indexOf(DCE_BUSY_TONE)       !== -1 ||
-            chunk.indexOf(DCE_DIAL_TONE)       !== -1) {
-          // Capture audio up to the terminator
-          const termIdx = Math.min(
-            ...[DCE_END_VOICE_DATA, DCE_PHONE_OFF_HOOK, DCE_BUSY_TONE, DCE_DIAL_TONE]
-              .map(seq => chunk.indexOf(seq))
-              .filter(i => i !== -1)
-          );
+      // Check for modem status codes that signal end of recording.
+      // Only codes in this modem's HANGUP_SEQS are checked — prevents false
+      // positives from voice data bytes that match another modem's DLE codes.
+      if (chunk.includes(0x10)) {
+        const hitIdx = hangupSeqs.map(seq => chunk.indexOf(seq)).filter(i => i !== -1);
+        if (hitIdx.length > 0) {
+          const termIdx = Math.min(...hitIdx);
           if (termIdx > 0) this.voiceBuffer.push(chunk.slice(0, termIdx));
           this.inVoiceMode = false;
           this.emit({ type: 'CALL_END' });
@@ -154,6 +171,18 @@ export class Modem {
       this.voiceBuffer.push(chunk);
       this.emit({ type: 'VOICE_DATA', chunk });
       return;
+    }
+
+    // While off-hook but not yet recording (i.e. during greeting playback),
+    // the modem sends DLE-escaped codes for hang-up rather than "NO CARRIER".
+    // Detect them here so goToVoicemail can skip recording.
+    if (this.isOffHook && chunk.includes(0x10)) {
+      if (hangupSeqs.some(seq => chunk.indexOf(seq) !== -1)) {
+        this.isOffHook = false;
+        this.inVoiceMode = false;
+        this.emit({ type: 'CALL_END' });
+        return;
+      }
     }
 
     // Text mode: accumulate and scan for known modem responses
@@ -250,6 +279,7 @@ export class Modem {
     await this.sendCommand('AT+FCLASS=8', 500);
     await this.sendCommand(DISABLE_SILENCE_DETECTION[this.model], 500);
     await this.sendCommand('AT+VLS=1', 1000); // TAD off-hook (answers the call)
+    this.isOffHook = true;
   }
 
   /**
@@ -270,6 +300,7 @@ export class Modem {
     await this.sendCommand('ATH0', 500);
     await this.sendCommand('AT+FCLASS=0', 500); // restore command mode after on-hook
     this.inVoiceMode = false;
+    this.isOffHook = false;
     this.voiceBuffer = [];
     this.textBuffer = '';
   }

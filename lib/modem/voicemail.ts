@@ -17,9 +17,12 @@ export async function ensureMessagesDir(): Promise<void> {
  * Convert raw PCM buffer (8-bit unsigned, 8kHz, mono) to MP3 using ffmpeg.
  * Returns the output MP3 filename (basename only).
  */
-export async function savePcmAsMP3(pcmBuffer: Buffer, callLogId: number, number: string, name: string): Promise<string> {
+export async function savePcmAsMP3(pcmBuffer: Buffer, callLogId: number, number: string, name: string): Promise<string | null> {
   await ensureMessagesDir();
-  const trimmed = trimTrailingSilence(pcmBuffer);
+  const trimmed = trimSilence(pcmBuffer);
+  // At 8kHz 8-bit mono: 4000 bytes = 0.5 seconds. Anything shorter after
+  // trimming silence/dial tone is not a real voicemail.
+  if (trimmed.length < 4000) return null;
   const now = new Date();
   const mm  = String(now.getMonth() + 1).padStart(2, '0');
   const dd  = String(now.getDate()).padStart(2, '0');
@@ -47,17 +50,18 @@ export async function savePcmAsMP3(pcmBuffer: Buffer, callLogId: number, number:
   }
 }
 
-function trimTrailingSilence(pcm: Buffer): Buffer {
+function trimSilence(pcm: Buffer): Buffer {
   const SILENCE_MIN = 126;
   const SILENCE_MAX = 129;
   const CHUNK = 1024;
 
+  let firstAudioChunk = -1;
   let lastAudioChunk = 0;
+
   for (let i = 0; i < pcm.length; i += CHUNK) {
     const end = Math.min(i + CHUNK, pcm.length);
     const chunkLen = end - i;
 
-    // Check for silence
     let hasSpeech = false;
     for (let j = i; j < end; j++) {
       if (pcm[j] < SILENCE_MIN || pcm[j] > SILENCE_MAX) {
@@ -68,11 +72,16 @@ function trimTrailingSilence(pcm: Buffer): Buffer {
 
     // Keep this chunk only if it has non-silence AND is not dial tone
     if (hasSpeech && !isDialToneChunk(pcm, i, chunkLen)) {
+      if (firstAudioChunk === -1) firstAudioChunk = i;
       lastAudioChunk = end;
     }
   }
 
-  return lastAudioChunk > 0 ? pcm.slice(0, lastAudioChunk) : pcm;
+  // No audio found at all (all silence or all dial tone) — return empty
+  if (firstAudioChunk === -1) return Buffer.alloc(0);
+
+  // Trim both leading and trailing silence/dial-tone
+  return pcm.slice(firstAudioChunk, lastAudioChunk);
 }
 
 /**

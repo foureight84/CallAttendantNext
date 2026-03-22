@@ -347,6 +347,15 @@ async function goToVoicemail(callLogId: number, greetingBasename: string, voice:
     modemLog('warn', `Could not play greeting: ${err}`);
   }
 
+  // If the caller hung up during greeting playback, CALL_END will have fired
+  // and reset isHandlingCall to false — skip recording entirely.
+  if (!isHandlingCall) {
+    modemLog('info', 'Caller hung up during greeting — skipping recording');
+    await modem.hangUp().catch(() => {});
+    resetCallState();
+    return;
+  }
+
   modemLog('info', 'Starting recording — playing beep (AT+VTS=[900,900,120]) then AT+VRX...');
   await modem.startRecording();
   modemLog('info', 'Recording voicemail...');
@@ -368,17 +377,22 @@ async function goToVoicemail(callLogId: number, greetingBasename: string, voice:
   const pcmData = modem.getRecordedBuffer();
   modemLog('info', `Recording ended — ${pcmData.length} bytes captured`);
 
-  if (pcmData.length > 1000) {
+  // 8000 bytes = 1 second at 8kHz 8-bit mono — filters hang-up transients
+  if (pcmData.length > 8000) {
     try {
       const filename = await savePcmAsMP3(pcmData, callLogId, number, name);
-      await insertMessage({ CallLogID: callLogId, Played: 0, Filename: filename, DateTime: new Date().toISOString() });
-      modemLog('info', `Voicemail saved: ${filename}`);
-      callEvents.emit('new-voicemail', { callLogId, filename });
+      if (filename) {
+        await insertMessage({ CallLogID: callLogId, Played: 0, Filename: filename, DateTime: new Date().toISOString() });
+        modemLog('info', `Voicemail saved: ${filename}`);
+        callEvents.emit('new-voicemail', { callLogId, filename });
+      } else {
+        modemLog('info', 'Recording discarded — insufficient audio content after trimming');
+      }
     } catch (err) {
       modemLog('error', `Failed to save voicemail: ${err}`);
     }
   } else {
-    modemLog('info', 'No voicemail left (silence)');
+    modemLog('info', 'No voicemail left (silence or too short)');
   }
 
   await modem.hangUp();
