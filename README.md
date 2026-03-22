@@ -127,6 +127,9 @@ After downloading, select the model in **Settings → Voice Model** and click **
 # Copy and edit your .env
 cp .env.example .env
 
+# Create directories for persistent data
+mkdir -p data messages logs
+
 # Place your .onnx models in ./piper-models/
 mkdir -p piper-models
 # (download models as shown above)
@@ -140,8 +143,8 @@ The app will be available at `http://localhost:3000`.
 ### Notes
 
 - The Dockerfile downloads the piper binary automatically during build
-- Mount your modem device via `devices` in `docker-compose.yml` (already configured for `/dev/ttyUSB0`)
-- The database (`./data/callattendant.db`) and messages directory (`./messages`) are persisted via bind mounts — Docker creates these directories automatically on first start
+- Mount your modem device via `devices` in `docker-compose.yml` (already configured for `/dev/ttyUSB0`). If your modem is on a different path, update both the `devices` entry and the `SERIAL_PORT` environment variable in `docker-compose.yml`
+- `data/`, `messages/`, and `logs/` must exist before first run — Docker will create them automatically on start but as root-owned, which can cause permission issues
 - Pass all config via environment variables in `docker-compose.yml` — no `.env` file is loaded inside the container
 
 ### Rebuild after code changes
