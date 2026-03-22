@@ -140,6 +140,7 @@ export default function MessagesPage() {
             onChange={v => { setPageSize(Number(v)); setPage(1); }}
             w={80}
             size="xs"
+            allowDeselect={false}
           />
         </Group>
       </Group>

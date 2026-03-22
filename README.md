@@ -188,6 +188,9 @@ npm run build
 cp .env.example .env
 # Edit .env — set SERIAL_PORT and SERIAL_BAUD_RATE at minimum
 nano .env
+
+# Create directories for persistent data
+mkdir -p data messages logs
 ```
 
 Download Piper and models as described in the [Piper TTS Setup](#piper-tts-setup) section above.

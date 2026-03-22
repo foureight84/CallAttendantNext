@@ -109,6 +109,7 @@ export default function SettingsPage() {
                   value={form.values.greetingVoice}
                   onChange={(v) => form.setFieldValue('greetingVoice', v ?? '')}
                   style={{ flex: 1 }}
+                  allowDeselect={false}
                 />
                 <NumberInput
                   label="Speed (length_scale)"
@@ -151,6 +152,7 @@ export default function SettingsPage() {
                   { value: 'NOMOROBO', label: 'Nomorobo' },
                   { value: 'NONE', label: 'None (lists only)' },
                 ]}
+                allowDeselect={false}
                 {...form.getInputProps('blockService')}
               />
               <Switch
