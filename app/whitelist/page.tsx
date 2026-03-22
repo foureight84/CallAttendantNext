@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Stack, Title, Table, Button, Group, Text, TextInput, Select, Pagination, Card } from '@mantine/core';
+import { Stack, Title, Table, Button, Group, Text, TextInput, Select, Pagination, Card, Box } from '@mantine/core';
 import { useDebouncedValue, useDisclosure } from '@mantine/hooks';
 import { AddToListModal } from '@/components/AddToListModal';
 import { apiClient } from '@/lib/api-client';
@@ -89,36 +89,61 @@ export default function WhitelistPage() {
         </Group>
       </Group>
 
-      <Table striped highlightOnHover>
-        <Table.Thead>
-          <Table.Tr>
-            <Table.Th>Phone Number</Table.Th>
-            <Table.Th>Name</Table.Th>
-            <Table.Th>Reason</Table.Th>
-            <Table.Th>Added</Table.Th>
-            <Table.Th></Table.Th>
-          </Table.Tr>
-        </Table.Thead>
-        <Table.Tbody>
+      <Box visibleFrom="sm">
+        <Table striped highlightOnHover>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>Phone Number</Table.Th>
+              <Table.Th>Name</Table.Th>
+              <Table.Th>Reason</Table.Th>
+              <Table.Th>Added</Table.Th>
+              <Table.Th></Table.Th>
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {rows.map((row) => (
+              <Table.Tr key={row.phoneNo}>
+                <Table.Td>{row.phoneNo}</Table.Td>
+                <Table.Td>{row.name ?? '—'}</Table.Td>
+                <Table.Td>{row.reason ?? '—'}</Table.Td>
+                <Table.Td>{row.systemDateTime ? new Date(row.systemDateTime).toLocaleDateString() : '—'}</Table.Td>
+                <Table.Td>
+                  <Group gap={6} wrap="nowrap">
+                    <Button size="xs" variant="light" onClick={() => setEditEntry(row)}>Edit</Button>
+                    <Button size="xs" variant="light" color="red" onClick={() => remove(row.phoneNo)}>Remove</Button>
+                  </Group>
+                </Table.Td>
+              </Table.Tr>
+            ))}
+            {rows.length === 0 && (
+              <Table.Tr><Table.Td colSpan={5} style={{ textAlign: 'center' }}>No entries</Table.Td></Table.Tr>
+            )}
+          </Table.Tbody>
+        </Table>
+      </Box>
+
+      {/* Mobile cards */}
+      <Box hiddenFrom="sm">
+        <Stack gap="sm">
           {rows.map((row) => (
-            <Table.Tr key={row.phoneNo}>
-              <Table.Td>{row.phoneNo}</Table.Td>
-              <Table.Td>{row.name ?? '—'}</Table.Td>
-              <Table.Td>{row.reason ?? '—'}</Table.Td>
-              <Table.Td>{row.systemDateTime ? new Date(row.systemDateTime).toLocaleDateString() : '—'}</Table.Td>
-              <Table.Td>
-                <Group gap={6} wrap="nowrap">
+            <Card key={row.phoneNo} shadow="sm" padding="md" radius="md" withBorder>
+              <Group justify="space-between" align="flex-start" mb={4}>
+                <div>
+                  <Text fw={600}>{row.phoneNo}</Text>
+                  <Text size="sm" c="dimmed">{row.name ?? '—'}</Text>
+                </div>
+                <Group gap={6}>
                   <Button size="xs" variant="light" onClick={() => setEditEntry(row)}>Edit</Button>
                   <Button size="xs" variant="light" color="red" onClick={() => remove(row.phoneNo)}>Remove</Button>
                 </Group>
-              </Table.Td>
-            </Table.Tr>
+              </Group>
+              {row.reason && <Text size="sm" mb={4}>{row.reason}</Text>}
+              <Text size="xs" c="dimmed">Added: {row.systemDateTime ? new Date(row.systemDateTime).toLocaleDateString() : '—'}</Text>
+            </Card>
           ))}
-          {rows.length === 0 && (
-            <Table.Tr><Table.Td colSpan={5} style={{ textAlign: 'center' }}>No entries</Table.Td></Table.Tr>
-          )}
-        </Table.Tbody>
-      </Table>
+          {rows.length === 0 && <Text c="dimmed" ta="center">No entries</Text>}
+        </Stack>
+      </Box>
 
       {totalPages > 1 && (
         <Group justify="center">

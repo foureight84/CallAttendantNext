@@ -135,92 +135,142 @@ export default function CallsPage() {
         </Group>
       </Group>
 
-      <Table striped highlightOnHover>
-        <Table.Thead>
-          <Table.Tr>
-            <Table.Th>ID</Table.Th>
-            <Table.Th>Date</Table.Th>
-            <Table.Th>Time</Table.Th>
-            <Table.Th>Name</Table.Th>
-            <Table.Th>Number</Table.Th>
-            <Table.Th visibleFrom="sm">Action</Table.Th>
-            <Table.Th visibleFrom="sm">Reason</Table.Th>
-            <Table.Th></Table.Th>
-            <Table.Th></Table.Th>
-          </Table.Tr>
-        </Table.Thead>
-        <Table.Tbody>
+      <Box visibleFrom="sm">
+        <Table striped highlightOnHover>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>ID</Table.Th>
+              <Table.Th>Date</Table.Th>
+              <Table.Th>Time</Table.Th>
+              <Table.Th>Name</Table.Th>
+              <Table.Th>Number</Table.Th>
+              <Table.Th visibleFrom="sm">Action</Table.Th>
+              <Table.Th visibleFrom="sm">Reason</Table.Th>
+              <Table.Th></Table.Th>
+              <Table.Th></Table.Th>
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {rows.map((call) => {
+              const inList = !!call.number && (whitelist.has(call.number) || blacklist.has(call.number));
+              const displayName = resolveCallerName(call.number, call.name, whitelist, blacklist);
+              const voicemail = voicemailMap.get(call.callLogId);
+              return (
+                <Table.Tr key={call.callLogId}>
+                  <Table.Td>{call.callLogId}</Table.Td>
+                  <Table.Td>{call.date ?? '—'}</Table.Td>
+                  <Table.Td>{call.time ?? '—'}</Table.Td>
+                  <Table.Td>{displayName}</Table.Td>
+                  <Table.Td>{call.number ?? '—'}</Table.Td>
+                  <Table.Td visibleFrom="sm"><ActionBadge action={call.action} /></Table.Td>
+                  <Table.Td visibleFrom="sm" style={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {call.reason ?? '—'}
+                  </Table.Td>
+                  <Table.Td>
+                    {voicemail && (
+                      <UnstyledButton onClick={() => setVoicemailModal({ message: voicemail, call })}>
+                        <IconRecordMail
+                          size={26}
+                          stroke={1.5}
+                          color={voicemail.played === 0
+                            ? 'var(--mantine-color-blue-6)'
+                            : 'var(--mantine-color-dimmed)'}
+                        />
+                      </UnstyledButton>
+                    )}
+                  </Table.Td>
+                  <Table.Td>
+                    {call.number && !inList && (
+                      <>
+                        <Box visibleFrom="sm">
+                          <Group gap={6} wrap="nowrap">
+                            <Button size="xs" variant="light" color="green" onClick={() => setModal({ list: 'whitelist', call })}>
+                              Add to Phonebook
+                            </Button>
+                            <Button size="xs" variant="light" color="red" onClick={() => setModal({ list: 'blacklist', call })}>
+                              Block
+                            </Button>
+                          </Group>
+                        </Box>
+                        <Box hiddenFrom="sm">
+                          <Menu position="bottom-end" withinPortal>
+                            <Menu.Target>
+                              <ActionIcon variant="subtle" size="sm">
+                                <IconDots size={16} />
+                              </ActionIcon>
+                            </Menu.Target>
+                            <Menu.Dropdown>
+                              <Menu.Item leftSection={<IconAddressBook size={14} />} color="green" onClick={() => setModal({ list: 'whitelist', call })}>
+                                Add to Phonebook
+                              </Menu.Item>
+                              <Menu.Item leftSection={<IconBan size={14} />} color="red" onClick={() => setModal({ list: 'blacklist', call })}>
+                                Block
+                              </Menu.Item>
+                            </Menu.Dropdown>
+                          </Menu>
+                        </Box>
+                      </>
+                    )}
+                  </Table.Td>
+                </Table.Tr>
+              );
+            })}
+            {rows.length === 0 && (
+              <Table.Tr>
+                <Table.Td colSpan={9} style={{ textAlign: 'center' }}>No calls found</Table.Td>
+              </Table.Tr>
+            )}
+          </Table.Tbody>
+        </Table>
+      </Box>
+
+      {/* Mobile cards */}
+      <Box hiddenFrom="sm">
+        <Stack gap="sm">
           {rows.map((call) => {
             const inList = !!call.number && (whitelist.has(call.number) || blacklist.has(call.number));
             const displayName = resolveCallerName(call.number, call.name, whitelist, blacklist);
             const voicemail = voicemailMap.get(call.callLogId);
             return (
-              <Table.Tr key={call.callLogId}>
-                <Table.Td>{call.callLogId}</Table.Td>
-                <Table.Td>{call.date ?? '—'}</Table.Td>
-                <Table.Td>{call.time ?? '—'}</Table.Td>
-                <Table.Td>{displayName}</Table.Td>
-                <Table.Td>{call.number ?? '—'}</Table.Td>
-                <Table.Td visibleFrom="sm"><ActionBadge action={call.action} /></Table.Td>
-                <Table.Td visibleFrom="sm" style={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {call.reason ?? '—'}
-                </Table.Td>
-                <Table.Td>
+              <Card key={call.callLogId} shadow="sm" padding="md" radius="md" withBorder>
+                <Group justify="space-between" align="flex-start" mb={4}>
+                  <div>
+                    <Text fw={600}>{displayName}</Text>
+                    <Text size="sm" c="dimmed">{call.number ?? '—'}</Text>
+                  </div>
+                  <ActionBadge action={call.action} />
+                </Group>
+                <Text size="xs" c="dimmed" mb="xs">{call.date ?? '—'} {call.time ?? ''}</Text>
+                {call.reason && (
+                  <Text size="sm" c="dimmed" mb="xs">{call.reason}</Text>
+                )}
+                <Group gap="xs" mt="xs">
                   {voicemail && (
                     <UnstyledButton onClick={() => setVoicemailModal({ message: voicemail, call })}>
                       <IconRecordMail
                         size={26}
                         stroke={1.5}
-                        color={voicemail.played === 0
-                          ? 'var(--mantine-color-blue-6)'
-                          : 'var(--mantine-color-dimmed)'}
+                        color={voicemail.played === 0 ? 'var(--mantine-color-blue-6)' : 'var(--mantine-color-dimmed)'}
                       />
                     </UnstyledButton>
                   )}
-                </Table.Td>
-                <Table.Td>
                   {call.number && !inList && (
                     <>
-                      <Box visibleFrom="sm">
-                        <Group gap={6} wrap="nowrap">
-                          <Button size="xs" variant="light" color="green" onClick={() => setModal({ list: 'whitelist', call })}>
-                            Add to Phonebook
-                          </Button>
-                          <Button size="xs" variant="light" color="red" onClick={() => setModal({ list: 'blacklist', call })}>
-                            Block
-                          </Button>
-                        </Group>
-                      </Box>
-                      <Box hiddenFrom="sm">
-                        <Menu position="bottom-end" withinPortal>
-                          <Menu.Target>
-                            <ActionIcon variant="subtle" size="sm">
-                              <IconDots size={16} />
-                            </ActionIcon>
-                          </Menu.Target>
-                          <Menu.Dropdown>
-                            <Menu.Item leftSection={<IconAddressBook size={14} />} color="green" onClick={() => setModal({ list: 'whitelist', call })}>
-                              Add to Phonebook
-                            </Menu.Item>
-                            <Menu.Item leftSection={<IconBan size={14} />} color="red" onClick={() => setModal({ list: 'blacklist', call })}>
-                              Block
-                            </Menu.Item>
-                          </Menu.Dropdown>
-                        </Menu>
-                      </Box>
+                      <Button size="xs" variant="light" color="green" onClick={() => setModal({ list: 'whitelist', call })}>
+                        Add to Phonebook
+                      </Button>
+                      <Button size="xs" variant="light" color="red" onClick={() => setModal({ list: 'blacklist', call })}>
+                        Block
+                      </Button>
                     </>
                   )}
-                </Table.Td>
-              </Table.Tr>
+                </Group>
+              </Card>
             );
           })}
-          {rows.length === 0 && (
-            <Table.Tr>
-              <Table.Td colSpan={9} style={{ textAlign: 'center' }}>No calls found</Table.Td>
-            </Table.Tr>
-          )}
-        </Table.Tbody>
-      </Table>
+          {rows.length === 0 && <Text c="dimmed" ta="center">No calls found</Text>}
+        </Stack>
+      </Box>
 
       {totalPages > 1 && (
         <Group justify="center">

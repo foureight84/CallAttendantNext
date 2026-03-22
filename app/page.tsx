@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useState, useRef } from 'react';
-import { Card, Text, Title, Table, Badge, Stack, Tabs, UnstyledButton, SimpleGrid } from '@mantine/core';
+import { Card, Text, Title, Table, Badge, Stack, Tabs, UnstyledButton, SimpleGrid, Box, Group } from '@mantine/core';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { IconRecordMail } from '@tabler/icons-react';
 import { apiClient } from '@/lib/api-client';
@@ -170,36 +170,77 @@ export default function DashboardPage() {
 
       <Card shadow="sm" padding="lg" radius="md" withBorder>
         <Title order={4} mb="md">Recent Calls</Title>
-        <div style={{ overflowX: 'auto' }}>
-        <Table
-          verticalSpacing={mounted ? 'xs' : undefined}
-          fz={mounted ? 'sm' : undefined}
-          striped={mounted ? 'odd' : undefined}
-          stripedColor={mounted ? 'rgba(128,128,128,0.07)' : undefined}
-          highlightOnHover={mounted}
-          highlightOnHoverColor={mounted ? 'rgba(128,128,128,0.03)' : undefined}
-        >
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>Date</Table.Th>
-              <Table.Th>Time</Table.Th>
-              <Table.Th>Name</Table.Th>
-              <Table.Th>Number</Table.Th>
-              <Table.Th visibleFrom="sm">Action</Table.Th>
-              <Table.Th></Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
+        {/* Desktop */}
+        <Box visibleFrom="sm" style={{ overflowX: 'auto' }}>
+          <Table
+            verticalSpacing={mounted ? 'xs' : undefined}
+            fz={mounted ? 'sm' : undefined}
+            striped={mounted ? 'odd' : undefined}
+            stripedColor={mounted ? 'rgba(128,128,128,0.07)' : undefined}
+            highlightOnHover={mounted}
+            highlightOnHoverColor={mounted ? 'rgba(128,128,128,0.03)' : undefined}
+          >
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>Date</Table.Th>
+                <Table.Th>Time</Table.Th>
+                <Table.Th>Name</Table.Th>
+                <Table.Th>Number</Table.Th>
+                <Table.Th>Action</Table.Th>
+                <Table.Th></Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {recentCalls.map((call) => {
+                const voicemail = voicemailMap.get(call.callLogId);
+                return (
+                  <Table.Tr key={call.callLogId}>
+                    <Table.Td>{call.date}</Table.Td>
+                    <Table.Td>{call.time}</Table.Td>
+                    <Table.Td>{resolveCallerName(call.number, call.name, whitelist, blacklist)}</Table.Td>
+                    <Table.Td>{call.number ?? '—'}</Table.Td>
+                    <Table.Td><ActionBadge action={call.action} /></Table.Td>
+                    <Table.Td>
+                      {voicemail && (
+                        <UnstyledButton onClick={() => setVoicemailModal({ message: voicemail, call })}>
+                          <IconRecordMail
+                            size={26}
+                            stroke={1.5}
+                            color={voicemail.played === 0
+                              ? 'var(--mantine-color-blue-6)'
+                              : 'var(--mantine-color-dimmed)'}
+                          />
+                        </UnstyledButton>
+                      )}
+                    </Table.Td>
+                  </Table.Tr>
+                );
+              })}
+              {recentCalls.length === 0 && (
+                <Table.Tr>
+                  <Table.Td colSpan={6} style={{ textAlign: 'center' }}>No calls yet</Table.Td>
+                </Table.Tr>
+              )}
+            </Table.Tbody>
+          </Table>
+        </Box>
+
+        {/* Mobile */}
+        <Box hiddenFrom="sm">
+          <Stack gap="sm">
             {recentCalls.map((call) => {
               const voicemail = voicemailMap.get(call.callLogId);
               return (
-                <Table.Tr key={call.callLogId}>
-                  <Table.Td>{call.date}</Table.Td>
-                  <Table.Td>{call.time}</Table.Td>
-                  <Table.Td>{resolveCallerName(call.number, call.name, whitelist, blacklist)}</Table.Td>
-                  <Table.Td>{call.number ?? '—'}</Table.Td>
-                  <Table.Td visibleFrom="sm"><ActionBadge action={call.action} /></Table.Td>
-                  <Table.Td>
+                <Card key={call.callLogId} shadow="sm" padding="md" radius="md" withBorder>
+                  <Group justify="space-between" align="flex-start" mb={4}>
+                    <div>
+                      <Text fw={600}>{resolveCallerName(call.number, call.name, whitelist, blacklist)}</Text>
+                      <Text size="sm" c="dimmed">{call.number ?? '—'}</Text>
+                    </div>
+                    <ActionBadge action={call.action} />
+                  </Group>
+                  <Group justify="space-between" align="center" mt="xs">
+                    <Text size="xs" c="dimmed">{call.date} {call.time}</Text>
                     {voicemail && (
                       <UnstyledButton onClick={() => setVoicemailModal({ message: voicemail, call })}>
                         <IconRecordMail
@@ -211,18 +252,13 @@ export default function DashboardPage() {
                         />
                       </UnstyledButton>
                     )}
-                  </Table.Td>
-                </Table.Tr>
+                  </Group>
+                </Card>
               );
             })}
-            {recentCalls.length === 0 && (
-              <Table.Tr>
-                <Table.Td colSpan={6} style={{ textAlign: 'center' }}>No calls yet</Table.Td>
-              </Table.Tr>
-            )}
-          </Table.Tbody>
-        </Table>
-        </div>
+            {recentCalls.length === 0 && <Text c="dimmed" ta="center">No calls yet</Text>}
+          </Stack>
+        </Box>
       </Card>
 
       <Card shadow="sm" padding="lg" radius="md" withBorder>
