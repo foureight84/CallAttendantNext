@@ -64,6 +64,15 @@ const RECORD_GAIN: Record<ModemModel, string | null> = {
   UNKNOWN:  'AT+VGR=134',
 };
 
+// AT+VGT: transmit (playback) volume applied before AT+VTX.
+//   All three modems support the same 0-255 range with 128=nominal.
+const PLAYBACK_VOLUME: Record<ModemModel, string> = {
+  USR:      'AT+VGT=200',
+  CONEXANT: 'AT+VGT=200',
+  MT9234MU: 'AT+VGT=200',
+  UNKNOWN:  'AT+VGT=200',
+};
+
 // Audio chunk sleep interval (ms) while streaming audio to modem
 const AUDIO_CHUNK_SLEEP: Record<ModemModel, number> = {
   USR:      100,
@@ -328,6 +337,7 @@ export class Modem {
 
     await this.sendCommand('AT+FCLASS=8', 500);
     await this.sendCommand(VOICE_COMPRESSION[this.model], 500);
+    await this.sendCommand(PLAYBACK_VOLUME[this.model], 500);
     await this.sendCommand('AT+VLS=1', 500);
     await this.sendCommand('AT+VTX', 2000); // modem responds with CONNECT
 
@@ -352,6 +362,7 @@ export class Modem {
 
     await this.sendCommand('AT+FCLASS=8', 500);
     await this.sendCommand(VOICE_COMPRESSION[this.model], 500);
+    await this.sendCommand(PLAYBACK_VOLUME[this.model], 500);
     await this.sendCommand('AT+VLS=1', 500);
     await this.sendCommand('AT+VTX', 2000);
 
