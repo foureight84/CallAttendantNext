@@ -272,6 +272,7 @@ export default function SettingsPage() {
 
         </Stack>
       </form>
+      <Text size="xs" c="dimmed" ta="center">v{process.env.NEXT_PUBLIC_APP_VERSION}</Text>
     </Stack>
   );
 }
