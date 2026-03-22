@@ -36,7 +36,7 @@ export default function BlacklistPage() {
   const [editEntry, setEditEntry] = useState<ListEntry | null>(null);
 
   const load = () =>
-    apiClient.blacklist.list({ limit: pageSize, offset: (page - 1) * pageSize, search: debouncedSearch || undefined, startDate: startDate || undefined, endDate: endDate || undefined })
+    apiClient.blacklist.list({ limit: pageSize, offset: (page - 1) * pageSize, search: debouncedSearch || undefined, startDate: startDate ? new Date(`${startDate}T00:00:00`).toISOString() : undefined, endDate: endDate ? new Date(`${endDate}T23:59:59.999`).toISOString() : undefined })
       .then(d => { setRows(d.rows); setTotal(d.total); });
 
   useEffect(() => {

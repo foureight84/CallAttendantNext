@@ -97,7 +97,7 @@ export async function getCallLog(
   const conditions = [];
   if (search)    conditions.push(...buildSearchConditions(search, callLog.name, callLog.number));
   if (startDate) conditions.push(gte(callLog.systemDateTime, startDate));
-  if (endDate)   conditions.push(lte(callLog.systemDateTime, endDate + 'T23:59:59.999Z'));
+  if (endDate)   conditions.push(lte(callLog.systemDateTime, endDate));
   return db.select().from(callLog)
     .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(desc(callLog.callLogId))
@@ -108,7 +108,7 @@ export async function getCallLogCount(search?: string, startDate?: string, endDa
   const conditions = [];
   if (search)    conditions.push(...buildSearchConditions(search, callLog.name, callLog.number));
   if (startDate) conditions.push(gte(callLog.systemDateTime, startDate));
-  if (endDate)   conditions.push(lte(callLog.systemDateTime, endDate + 'T23:59:59.999Z'));
+  if (endDate)   conditions.push(lte(callLog.systemDateTime, endDate));
   const [row] = await db.select({ count: drizzleCount() }).from(callLog)
     .where(conditions.length ? and(...conditions) : undefined);
   return row?.count ?? 0;
@@ -165,7 +165,7 @@ function buildListConditions(table: typeof whitelist | typeof blacklist, search?
     conditions.push(sql`(lower(${table.phoneNo}) LIKE ${pattern} OR lower(coalesce(${table.name}, '')) LIKE ${pattern})`);
   }
   if (startDate) conditions.push(gte(table.systemDateTime, startDate));
-  if (endDate)   conditions.push(lte(table.systemDateTime, endDate + 'T23:59:59.999Z'));
+  if (endDate)   conditions.push(lte(table.systemDateTime, endDate));
   return conditions.length ? and(...conditions) : undefined;
 }
 
@@ -259,7 +259,7 @@ export async function getMessages(q: MessageQuery = {}): Promise<MessageRow[]> {
   const conditions = [];
   if (search)       conditions.push(...buildSearchConditions(search, callLog.name, callLog.number));
   if (startDate)    conditions.push(gte(message.dateTime, startDate));
-  if (endDate)      conditions.push(lte(message.dateTime, endDate + 'T23:59:59.999Z'));
+  if (endDate)      conditions.push(lte(message.dateTime, endDate));
   if (unplayedOnly) conditions.push(eq(message.played, 0));
   return db.select({
     messageId: message.messageId, callLogId: message.callLogId, played: message.played,
@@ -277,7 +277,7 @@ export async function getMessagesCount(q: Pick<MessageQuery, 'search' | 'startDa
   const conditions = [];
   if (search)       conditions.push(...buildSearchConditions(search, callLog.name, callLog.number));
   if (startDate)    conditions.push(gte(message.dateTime, startDate));
-  if (endDate)      conditions.push(lte(message.dateTime, endDate + 'T23:59:59.999Z'));
+  if (endDate)      conditions.push(lte(message.dateTime, endDate));
   if (unplayedOnly) conditions.push(eq(message.played, 0));
   const [row] = await db.select({ count: drizzleCount() }).from(message)
     .leftJoin(callLog, eq(message.callLogId, callLog.callLogId))

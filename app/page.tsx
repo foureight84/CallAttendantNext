@@ -95,13 +95,15 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const rafId = requestAnimationFrame(() => setMounted(true));
-    const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+    const todayEnd   = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).toISOString();
 
     apiClient.calls.list({ limit: 10, offset: 0 }).then(data => {
       setRecentCalls(data.rows ?? []);
     });
 
-    apiClient.calls.list({ limit: 500, offset: 0, startDate: today, endDate: today }).then(data => {
+    apiClient.calls.list({ limit: 500, offset: 0, startDate: todayStart, endDate: todayEnd }).then(data => {
       const rows = data.rows ?? [];
       setStats({
         total:     data.total ?? 0,
