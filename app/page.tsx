@@ -157,7 +157,18 @@ export default function DashboardPage() {
 
   return (
     <Stack gap="lg">
-      <Title order={2}>Dashboard</Title>
+      <Box
+        style={{
+          position: 'sticky',
+          top: 'var(--app-shell-header-height, 0)',
+          zIndex: 100,
+          background: 'var(--mantine-color-body)',
+          paddingTop: 8,
+          paddingBottom: 8,
+        }}
+      >
+        <Title order={2}>Dashboard</Title>
+      </Box>
 
       <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="md">
         {statCards.map((s) => (

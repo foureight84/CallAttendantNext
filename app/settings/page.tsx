@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Stack, Title, Card, Group, Text, Button, Slider, NumberInput, Switch, Select, MultiSelect, Divider, Radio, TextInput } from '@mantine/core';
+import { Stack, Title, Card, Group, Text, Button, Slider, NumberInput, Switch, Select, MultiSelect, Divider, Radio, TextInput, Box } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useForm } from '@mantine/form';
 import { apiClient } from '@/lib/api-client';
@@ -35,7 +35,7 @@ export default function SettingsPage() {
   });
 
   useEffect(() => {
-    apiClient.settings.get().then(data => form.setValues(data));
+    apiClient.settings.get().then(data => form.initialize(data));
     fetch('/api/piper/models').then(r => r.json()).then(setModels).catch(() => {});
   }, []);
 
@@ -62,16 +62,32 @@ export default function SettingsPage() {
   const save = form.onSubmit(async (values) => {
     const { serialPort: _sp, serialBaudRate: _sbr, ...saveable } = values;
     await apiClient.settings.save(saveable);
+    form.resetDirty(values);
     window.dispatchEvent(new Event('settings-saved'));
     notifications.show({ title: 'Settings saved', message: 'Your changes have been applied.', color: 'green', autoClose: 3000 });
   });
 
   return (
     <Stack gap="lg">
-      <Title order={2}>Settings</Title>
-
       <form onSubmit={save}>
         <Stack gap="md">
+          <Box
+            style={{
+              position: 'sticky',
+              top: 'var(--app-shell-header-height, 0)',
+              zIndex: 100,
+              background: 'var(--mantine-color-body)',
+              paddingTop: 8,
+              paddingBottom: 8,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <Title order={2}>Settings</Title>
+            <Button type="submit" disabled={!form.isDirty()}>Save Settings</Button>
+          </Box>
+
           <Card shadow="sm" padding="lg" radius="md" withBorder>
             <Title order={4} mb="md">Modem</Title>
             <Stack gap="sm">
@@ -254,7 +270,6 @@ export default function SettingsPage() {
             </Stack>
           </Card>
 
-          <Button type="submit">Save Settings</Button>
         </Stack>
       </form>
     </Stack>

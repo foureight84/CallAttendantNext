@@ -92,7 +92,18 @@ export default function CallsPage() {
 
   return (
     <Stack gap="lg">
-      <Title order={2}>Call Log</Title>
+      <Box
+        style={{
+          position: 'sticky',
+          top: 'var(--app-shell-header-height, 0)',
+          zIndex: 100,
+          background: 'var(--mantine-color-body)',
+          paddingTop: 8,
+          paddingBottom: 8,
+        }}
+      >
+        <Title order={2}>Call Log</Title>
+      </Box>
       <Card shadow="sm" padding="md" radius="md" withBorder>
         <Group gap="sm" align="flex-end" wrap="wrap">
           <TextInput

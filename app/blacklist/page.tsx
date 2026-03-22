@@ -56,10 +56,22 @@ export default function BlacklistPage() {
 
   return (
     <Stack gap="lg">
-      <Group justify="space-between">
+      <Box
+        style={{
+          position: 'sticky',
+          top: 'var(--app-shell-header-height, 0)',
+          zIndex: 100,
+          background: 'var(--mantine-color-body)',
+          paddingTop: 8,
+          paddingBottom: 8,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
         <Title order={2}>Blocklist</Title>
         <Button color="red" onClick={open}>Add Number</Button>
-      </Group>
+      </Box>
 
       {settings && (
         <Text c="dimmed" size="sm">

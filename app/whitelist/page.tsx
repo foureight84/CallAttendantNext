@@ -38,10 +38,22 @@ export default function WhitelistPage() {
 
   return (
     <Stack gap="lg">
-      <Group justify="space-between">
+      <Box
+        style={{
+          position: 'sticky',
+          top: 'var(--app-shell-header-height, 0)',
+          zIndex: 100,
+          background: 'var(--mantine-color-body)',
+          paddingTop: 8,
+          paddingBottom: 8,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
         <Title order={2}>Phonebook</Title>
         <Button onClick={open}>Add Number</Button>
-      </Group>
+      </Box>
 
       <Text c="dimmed" size="sm">
         Numbers in the phonebook are always permitted without screening.
