@@ -25,6 +25,7 @@ const RING_TIMEOUT_BUFFER_MS = 2000;
 let ringCount = 0;
 let currentCallInfo: CallerIdInfo | null = null;
 let isHandlingCall = false;
+let isWaitingForRings = false;
 let screeningPromise: Promise<{ action: 'Blocked' | 'Permitted' | 'Screened'; reason: string }> | null = null;
 let ringTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
@@ -32,7 +33,7 @@ function scheduleRingTimeout(): void {
   if (ringTimeoutId !== null) clearTimeout(ringTimeoutId);
   ringTimeoutId = setTimeout(() => {
     ringTimeoutId = null;
-    if (!isHandlingCall && ringCount > 0) {
+    if ((isWaitingForRings || !isHandlingCall) && ringCount > 0) {
       modemLog('info', 'No additional ring received — caller likely hung up, resetting state');
       resetCallState();
     }
@@ -142,13 +143,16 @@ async function waitForScreeningWithTimeout(timeoutMs: number): Promise<boolean> 
 }
 
 async function handleRing(): Promise<void> {
-  if (isHandlingCall) return;
+  if (isHandlingCall) {
+    if (isWaitingForRings) scheduleRingTimeout();
+    return;
+  }
   ringCount++;
   modemLog('info', `RING #${ringCount}`);
+  scheduleRingTimeout();
 
   if (ringCount === 1) {
     blinkLed(GPIO_PINS.RING, 1).catch(() => {});
-    scheduleRingTimeout();
     // Caller ID normally arrives within ~2s after ring 1.
     // Poll up to 3.5s — if it arrives, process immediately (fast path).
     // If not, return and let ring 2 trigger as the fallback.
@@ -222,6 +226,7 @@ async function handleBlockedCall(callLogId: number, currentRing: number, name: s
     const ringsLeft = Math.max(0, settings.ringsBeforeVmBlocklist - currentRing);
     modemLog('info', `Blocked caller — sending to voicemail after ${ringsLeft} more ring(s)`);
     await waitForRings(ringsLeft);
+    if (!isHandlingCall) { modemLog('info', 'Blocked call aborted — caller hung up'); return; }
     await goToVoicemail(callLogId, 'general_greeting', settings.greetingVoice, settings.greetingLengthScale, name, number);
     await blinkLed(GPIO_PINS.BLOCKED, 1);
     return;
@@ -256,6 +261,7 @@ async function handlePermittedCall(callLogId: number, name: string, number: stri
   const ringsLeft = settings.ringsBeforeVm - ringCount;
   modemLog('info', `Permitted caller — waiting ${ringsLeft} more ring(s) before voicemail`);
   await waitForRings(ringsLeft);
+  if (!isHandlingCall) { modemLog('info', 'Permitted call aborted — caller hung up'); return; }
   await goToVoicemail(callLogId, 'general_greeting', settings.greetingVoice, settings.greetingLengthScale, name, number);
   await blinkLed(GPIO_PINS.ALLOWED, 1);
 }
@@ -266,6 +272,7 @@ async function handleScreenedCall(callLogId: number, currentRing: number, name: 
   const ringsLeft = immediate ? 0 : Math.max(0, settings.ringsBeforeVmScreened - currentRing);
   modemLog('info', `Screened caller — answering after ${ringsLeft} more ring(s)`);
   await waitForRings(ringsLeft);
+  if (!isHandlingCall) { modemLog('info', 'Screened call aborted — caller hung up'); return; }
   await goToVoicemail(callLogId, 'general_greeting', settings.greetingVoice, settings.greetingLengthScale, name, number);
 }
 
@@ -349,13 +356,20 @@ async function handleCallEnd(): Promise<void> {
 async function waitForRings(count: number): Promise<void> {
   if (count <= 0) return;
   modemLog('info', `Waiting for ${count} more ring(s)...`);
-  await sleep(count * 6000);
+  isWaitingForRings = true;
+  const waitMs = count * RING_INTERVAL_MS;
+  const start = Date.now();
+  while (isHandlingCall && Date.now() - start < waitMs) {
+    await sleep(100);
+  }
+  isWaitingForRings = false;
 }
 
 function resetCallState(): void {
   ringCount = 0;
   currentCallInfo = null;
   isHandlingCall = false;
+  isWaitingForRings = false;
   screeningPromise = null;
   if (ringTimeoutId !== null) {
     clearTimeout(ringTimeoutId);
