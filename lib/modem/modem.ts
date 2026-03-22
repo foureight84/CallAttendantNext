@@ -52,6 +52,18 @@ const END_VOICE_RX: Record<ModemModel, Buffer> = {
   UNKNOWN:  Buffer.from([0x10, 0x21]),
 };
 
+// AT+VGR: receive (recording) gain boost applied before AT+VRX.
+//   USR:      range 121-134 effective (manual clamps outside); 128=nominal, 134=max
+//   CONEXANT: null — only VGR=0 (AGC) is valid per manual; no manual gain
+//   MT9234MU: range 0-255; 128=nominal, higher values amplify
+//   The command is skipped (null) when the modem doesn't support manual gain.
+const RECORD_GAIN: Record<ModemModel, string | null> = {
+  USR:      'AT+VGR=134',  // max useful per manual (effective range 121-134)
+  CONEXANT: null,          // AGC only — VGR=0 is the only valid value
+  MT9234MU: 'AT+VGR=180', // boosted above nominal (128); full range 0-255
+  UNKNOWN:  'AT+VGR=134',
+};
+
 // Audio chunk sleep interval (ms) while streaming audio to modem
 const AUDIO_CHUNK_SLEEP: Record<ModemModel, number> = {
   USR:      100,
@@ -361,6 +373,8 @@ export class Modem {
     await this.sendCommand('AT+FCLASS=8', 500);
     await this.sendCommand(VOICE_COMPRESSION[this.model], 500);
     await this.sendCommand(DISABLE_SILENCE_DETECTION[this.model], 500);
+    const recordGain = RECORD_GAIN[this.model];
+    if (recordGain) await this.sendCommand(recordGain, 500);
     await this.sendCommand('AT+VLS=1', 500);
     await this.sendCommand('AT+VTS=[900,900,120]', 2000); // 1.2 second beep
 
