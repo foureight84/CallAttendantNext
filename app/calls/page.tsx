@@ -244,25 +244,27 @@ export default function CallsPage() {
                 {call.reason && (
                   <Text size="sm" c="dimmed" mb="xs">{call.reason}</Text>
                 )}
-                <Group gap="xs" mt="xs">
-                  {voicemail && (
-                    <UnstyledButton onClick={() => setVoicemailModal({ message: voicemail, call })}>
-                      <IconRecordMail
-                        size={26}
-                        stroke={1.5}
-                        color={voicemail.played === 0 ? 'var(--mantine-color-blue-6)' : 'var(--mantine-color-dimmed)'}
-                      />
-                    </UnstyledButton>
-                  )}
+                <Group justify="space-between" align="center" mt="xs">
+                  <div>
+                    {voicemail && (
+                      <UnstyledButton onClick={() => setVoicemailModal({ message: voicemail, call })}>
+                        <IconRecordMail
+                          size={26}
+                          stroke={1.5}
+                          color={voicemail.played === 0 ? 'var(--mantine-color-blue-6)' : 'var(--mantine-color-dimmed)'}
+                        />
+                      </UnstyledButton>
+                    )}
+                  </div>
                   {call.number && !inList && (
-                    <>
+                    <Group gap="xs">
                       <Button size="xs" variant="light" color="green" onClick={() => setModal({ list: 'whitelist', call })}>
                         Add to Phonebook
                       </Button>
                       <Button size="xs" variant="light" color="red" onClick={() => setModal({ list: 'blacklist', call })}>
                         Block
                       </Button>
-                    </>
+                    </Group>
                   )}
                 </Group>
               </Card>

@@ -150,18 +150,14 @@ export default function BlacklistPage() {
         <Stack gap="sm">
           {rows.map((row) => (
             <Card key={row.phoneNo} shadow="sm" padding="md" radius="md" withBorder>
-              <Group justify="space-between" align="flex-start" mb={4}>
-                <div>
-                  <Text fw={600}>{row.phoneNo}</Text>
-                  <Text size="sm" c="dimmed">{row.name ?? '—'}</Text>
-                </div>
-                <Group gap={6}>
-                  <Button size="xs" variant="light" onClick={() => setEditEntry(row)}>Edit</Button>
-                  <Button size="xs" variant="light" color="red" onClick={() => remove(row.phoneNo)}>Remove</Button>
-                </Group>
-              </Group>
+              <Text fw={600}>{row.phoneNo}</Text>
+              <Text size="sm" c="dimmed" mb={4}>{row.name ?? '—'}</Text>
               {row.reason && <Text size="sm" mb={4}>{row.reason}</Text>}
-              <Text size="xs" c="dimmed">Added: {row.systemDateTime ? new Date(row.systemDateTime).toLocaleDateString() : '—'}</Text>
+              <Text size="xs" c="dimmed" mb="xs">Added: {row.systemDateTime ? new Date(row.systemDateTime).toLocaleDateString() : '—'}</Text>
+              <Group justify="flex-end" gap={6} mt="xs">
+                <Button size="xs" variant="light" onClick={() => setEditEntry(row)}>Edit</Button>
+                <Button size="xs" variant="light" color="red" onClick={() => remove(row.phoneNo)}>Remove</Button>
+              </Group>
             </Card>
           ))}
           {rows.length === 0 && <Text c="dimmed" ta="center">No entries</Text>}

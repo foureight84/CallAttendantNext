@@ -187,6 +187,7 @@ export default function DashboardPage() {
                 <Table.Th>Name</Table.Th>
                 <Table.Th>Number</Table.Th>
                 <Table.Th>Action</Table.Th>
+                <Table.Th>Reason</Table.Th>
                 <Table.Th></Table.Th>
               </Table.Tr>
             </Table.Thead>
@@ -200,6 +201,7 @@ export default function DashboardPage() {
                     <Table.Td>{resolveCallerName(call.number, call.name, whitelist, blacklist)}</Table.Td>
                     <Table.Td>{call.number ?? '—'}</Table.Td>
                     <Table.Td><ActionBadge action={call.action} /></Table.Td>
+                    <Table.Td style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{call.reason ?? '—'}</Table.Td>
                     <Table.Td>
                       {voicemail && (
                         <UnstyledButton onClick={() => setVoicemailModal({ message: voicemail, call })}>
@@ -218,7 +220,7 @@ export default function DashboardPage() {
               })}
               {recentCalls.length === 0 && (
                 <Table.Tr>
-                  <Table.Td colSpan={6} style={{ textAlign: 'center' }}>No calls yet</Table.Td>
+                  <Table.Td colSpan={7} style={{ textAlign: 'center' }}>No calls yet</Table.Td>
                 </Table.Tr>
               )}
             </Table.Tbody>
@@ -239,19 +241,22 @@ export default function DashboardPage() {
                     </div>
                     <ActionBadge action={call.action} />
                   </Group>
+                  <Text size="xs" c="dimmed" mt={4}>{call.date} {call.time}</Text>
+                  {call.reason && <Text size="sm" c="dimmed" mt={4}>{call.reason}</Text>}
                   <Group justify="space-between" align="center" mt="xs">
-                    <Text size="xs" c="dimmed">{call.date} {call.time}</Text>
-                    {voicemail && (
-                      <UnstyledButton onClick={() => setVoicemailModal({ message: voicemail, call })}>
-                        <IconRecordMail
-                          size={26}
-                          stroke={1.5}
-                          color={voicemail.played === 0
-                            ? 'var(--mantine-color-blue-6)'
-                            : 'var(--mantine-color-dimmed)'}
-                        />
-                      </UnstyledButton>
-                    )}
+                    <div>
+                      {voicemail && (
+                        <UnstyledButton onClick={() => setVoicemailModal({ message: voicemail, call })}>
+                          <IconRecordMail
+                            size={26}
+                            stroke={1.5}
+                            color={voicemail.played === 0
+                              ? 'var(--mantine-color-blue-6)'
+                              : 'var(--mantine-color-dimmed)'}
+                          />
+                        </UnstyledButton>
+                      )}
+                    </div>
                   </Group>
                 </Card>
               );
