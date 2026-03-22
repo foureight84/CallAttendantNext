@@ -28,6 +28,8 @@ let isHandlingCall = false;
 let isWaitingForRings = false;
 let screeningPromise: Promise<{ action: 'Blocked' | 'Permitted' | 'Screened'; reason: string }> | null = null;
 let ringTimeoutId: ReturnType<typeof setTimeout> | null = null;
+let preSynthesizedGreeting: Buffer[] | null = null;
+let preSynthesizedPleaseLeave: Buffer[] | null = null;
 
 function scheduleRingTimeout(): void {
   if (ringTimeoutId !== null) clearTimeout(ringTimeoutId);
@@ -103,6 +105,7 @@ export async function startDaemon(): Promise<void> {
             modemLog('error', `Screening failed: ${err}`);
             return { action: 'Screened' as const, reason: 'Screening error' };
           });
+          kickOffPreSynthesis().catch(() => {});
           break;
         case 'CALL_END':
           await handleCallEnd();
@@ -131,6 +134,37 @@ async function resolveCallerName(name: string, number: string): Promise<string> 
   }
   if (!name || name === 'O') return 'UNKNOWN';
   return name;
+}
+
+async function* fromBuffers(chunks: Buffer[]): AsyncGenerator<Buffer> {
+  for (const chunk of chunks) yield chunk;
+}
+
+async function collectChunks(gen: AsyncGenerator<Buffer>): Promise<Buffer[]> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of gen) chunks.push(chunk);
+  return chunks;
+}
+
+async function kickOffPreSynthesis(): Promise<void> {
+  try {
+    const settings = await getSettings();
+    if (!settings.greetingVoice) return;
+    const modelPath = resolveModelPath(settings.greetingVoice);
+    const [greetingText, pleaseLeaveText] = await Promise.all([
+      readScriptFile('general_greeting'),
+      readScriptFile('please_leave_message'),
+    ]);
+    const [greetingChunks, pleaseLeaveChunks] = await Promise.all([
+      collectChunks(synthesize(greetingText, modelPath, settings.greetingLengthScale)),
+      collectChunks(synthesize(pleaseLeaveText, modelPath, settings.greetingLengthScale)),
+    ]);
+    preSynthesizedGreeting = greetingChunks;
+    preSynthesizedPleaseLeave = pleaseLeaveChunks;
+    modemLog('info', 'Pre-synthesis complete — greeting audio buffered');
+  } catch (err) {
+    modemLog('warn', `Pre-synthesis failed (will synthesize on demand): ${err}`);
+  }
 }
 
 async function waitForScreeningWithTimeout(timeoutMs: number): Promise<boolean> {
@@ -296,13 +330,19 @@ async function goToVoicemail(callLogId: number, greetingBasename: string, voice:
   await sleep(1000);
 
   try {
-    const greetingText = await readScriptFile(greetingBasename);
-    modemLog('info', `Synthesizing ${greetingBasename} via TTS`);
-    await modem.playAudioStream(synthesize(greetingText, resolveModelPath(voice), lengthScale));
+    if (preSynthesizedGreeting && preSynthesizedPleaseLeave) {
+      modemLog('info', 'Playing pre-synthesized greeting audio');
+      await modem.playAudioStream(fromBuffers(preSynthesizedGreeting));
+      await modem.playAudioStream(fromBuffers(preSynthesizedPleaseLeave));
+    } else {
+      const greetingText = await readScriptFile(greetingBasename);
+      modemLog('info', `Synthesizing ${greetingBasename} via TTS`);
+      await modem.playAudioStream(synthesize(greetingText, resolveModelPath(voice), lengthScale));
 
-    const pleaseLeaveText = await readScriptFile('please_leave_message');
-    modemLog('info', 'Synthesizing please_leave_message via TTS');
-    await modem.playAudioStream(synthesize(pleaseLeaveText, resolveModelPath(voice), lengthScale));
+      const pleaseLeaveText = await readScriptFile('please_leave_message');
+      modemLog('info', 'Synthesizing please_leave_message via TTS');
+      await modem.playAudioStream(synthesize(pleaseLeaveText, resolveModelPath(voice), lengthScale));
+    }
   } catch (err) {
     modemLog('warn', `Could not play greeting: ${err}`);
   }
@@ -371,6 +411,8 @@ function resetCallState(): void {
   isHandlingCall = false;
   isWaitingForRings = false;
   screeningPromise = null;
+  preSynthesizedGreeting = null;
+  preSynthesizedPleaseLeave = null;
   if (ringTimeoutId !== null) {
     clearTimeout(ringTimeoutId);
     ringTimeoutId = null;

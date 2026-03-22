@@ -21,7 +21,7 @@ export async function checkNomorobo(phoneNumber: string): Promise<NomoroboResult
         'User-Agent': 'Mozilla/5.0 (compatible; CallAttendant/1.0)',
         'Accept': 'text/html',
       },
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(4000),
     });
 
     if (!response.ok) {
