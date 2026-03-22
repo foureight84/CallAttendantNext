@@ -17,8 +17,7 @@ function resolveName(msg: Message, whitelist: ListEntry[]): string {
     const entry = whitelist.find(w => w.phoneNo === msg.number);
     if (entry?.name) return entry.name;
   }
-  if (!msg.name || msg.name === 'O') return 'UNKNOWN';
-  return msg.name;
+  return msg.name ?? '—';
 }
 
 export default function MessagesPage() {

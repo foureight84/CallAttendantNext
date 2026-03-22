@@ -19,11 +19,6 @@ function ActionBadge({ action }: { action: string | null }) {
   return <Badge color={colorMap[action ?? ''] ?? 'gray'}>{action ?? 'Unknown'}</Badge>;
 }
 
-function normalizeName(name: string | null | undefined, fallback: string): string {
-  if (!name) return fallback;
-  return name.toUpperCase() === 'O' ? 'UNKNOWN' : name;
-}
-
 function resolveCallerName(
   number: string | null,
   callerIdName: string | null,
@@ -31,10 +26,10 @@ function resolveCallerName(
   blacklist: Map<string, string | null>,
 ): string {
   if (number) {
-    if (whitelist.has(number)) return normalizeName(whitelist.get(number), normalizeName(callerIdName, 'Unknown'));
-    if (blacklist.has(number)) return normalizeName(blacklist.get(number), normalizeName(callerIdName, 'Unknown'));
+    if (whitelist.has(number)) return whitelist.get(number) || callerIdName || 'Unknown';
+    if (blacklist.has(number)) return blacklist.get(number) || callerIdName || 'Unknown';
   }
-  return normalizeName(callerIdName, '—');
+  return callerIdName ?? '—';
 }
 
 function formatLabel(dateStr: string, days: number): string {

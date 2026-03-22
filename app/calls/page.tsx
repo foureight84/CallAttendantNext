@@ -24,8 +24,7 @@ function resolveCallerName(
     if (whitelist.has(number)) return whitelist.get(number) || callerIdName || 'Unknown';
     if (blacklist.has(number)) return blacklist.get(number) || callerIdName || 'Unknown';
   }
-  const name = callerIdName ?? '—';
-  return name.toUpperCase() === 'O' ? 'UNKNOWN' : name;
+  return callerIdName ?? '—';
 }
 
 const PAGE_SIZE_OPTIONS = ['10', '20', '50', '100'];
