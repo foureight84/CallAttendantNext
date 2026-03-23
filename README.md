@@ -12,7 +12,7 @@ A TypeScript/Next.js port of the [callattendant](https://github.com/emxsys/calla
 | MultiTech MT9234MU-CDC | 115200 — provides best voice quality |
 | ZOOM 3095 | 115200 — provides best voice quality |
 
-If you have a hardware modem not on this list and would like support added, open an issue at [foureight84/CallAttendantNext](https://github.com/foureight84/CallAttendantNext).
+If you have a hardware modem not on this list and would like support added, open an issue at [foureight84/CallAttendantNext](https://github.com/foureight84/CallAttendantNext/issues).
 
 ## Stack
 
