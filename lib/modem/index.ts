@@ -360,19 +360,40 @@ async function goToVoicemail(callLogId: number, greetingBasename: string, voice:
   await modem.startRecording();
   modemLog('info', 'Recording voicemail...');
 
-  // Wait until caller hangs up (inVoiceMode → false) or 120s timeout.
-  // Also exit early if isHandlingCall became false — this happens when the
-  // caller hung up during the beep inside startRecording() (the isOffHook
-  // path emits CALL_END before inVoiceMode is set, so startRecording() can
-  // still enter VRX mode after the caller is already gone).
+  // Wait until caller hangs up (inVoiceMode → false via DLE code) or 120s timeout.
+  // Also check isHandlingCall: if the caller hung up during the beep inside
+  // startRecording(), isOffHook detection emits CALL_END and resets
+  // isHandlingCall before inVoiceMode is set, so startRecording() can still
+  // enter VRX mode after the caller is already gone.
+  // Silence fallback: some modems (e.g. MT9234MU) don't send DLE hang-up
+  // codes into the VRX stream. Use a state machine: wait for real voice
+  // activity (≥60% non-silent in a 500ms window, after a 2s guard to skip
+  // line-connect transients), then trigger on 8s of sustained silence.
+  const SILENCE_HANGUP_MS = 8000;
   let waited = 0;
+  let audioSeen = false;
+  let silenceReason = false;
   while (modem.isRecording() && isHandlingCall && waited < 120000) {
     await sleep(500);
     waited += 500;
+    if (!audioSeen && waited >= 2000 && modem.hasRecentVoiceActivity(500, 0.60)) {
+      audioSeen = true;
+      modemLog('info', 'Voice activity detected — silence detection armed');
+    }
+    if (audioSeen && modem.hasSustainedSilence(SILENCE_HANGUP_MS)) {
+      silenceReason = true;
+      break;
+    }
   }
 
   if (modem.isRecording()) {
-    modemLog('info', waited >= 120000 ? 'Recording timeout — stopping recording' : 'Caller hung up — stopping recording');
+    if (silenceReason) {
+      modemLog('info', `${SILENCE_HANGUP_MS / 1000}s of silence after voice activity — caller likely hung up, stopping recording`);
+    } else if (waited >= 120000) {
+      modemLog('info', 'Recording timeout — stopping recording');
+    } else {
+      modemLog('info', 'Caller hung up — stopping recording');
+    }
   }
   await modem.stopRecording();
 
