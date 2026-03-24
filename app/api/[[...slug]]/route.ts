@@ -7,6 +7,7 @@ import {
   getSettings, saveSettings,
 } from '@/lib/db';
 import { callEvents, updateLogConfig } from '@/lib/events';
+import { existsSync } from 'fs';
 import { unlink, readdir } from 'fs/promises';
 import path from 'path';
 import { config } from '@/lib/config';
@@ -74,7 +75,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
       getMessages({ limit, offset, search, startDate, endDate, unplayedOnly }),
       getMessagesCount({ search, startDate, endDate, unplayedOnly }),
     ]);
-    return json({ messages, total });
+    const messagesWithPcm = messages.map(m => ({
+      ...m,
+      hasPcm: !!m.filename && existsSync(
+        path.join(config.messagesDir, path.basename(m.filename).replace(/\.[^.]+$/, '.pcm'))
+      ),
+    }));
+    return json({ messages: messagesWithPcm, total });
   }
 
   if (route === 'messages/unread') {

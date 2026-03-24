@@ -21,15 +21,20 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'File not found' }, { status: 404 });
   }
 
-  const ext = path.extname(safe);
+  const ext = path.extname(safe).toLowerCase();
   const base = path.basename(safe, ext);
   const downloadName = number
     ? `${base}_${number.replace(/\D/g, '')}${ext}`
     : safe;
 
+  const contentType =
+    ext === '.mp3' ? 'audio/mpeg' :
+    ext === '.pcm' ? 'application/octet-stream' :
+    'audio/wav';
+
   return new NextResponse(new Uint8Array(data), {
     headers: {
-      'Content-Type': 'audio/wav',
+      'Content-Type': contentType,
       'Content-Disposition': `attachment; filename="${downloadName}"`,
     },
   });

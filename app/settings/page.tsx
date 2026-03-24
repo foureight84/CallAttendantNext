@@ -26,6 +26,7 @@ export default function SettingsPage() {
       ringsBeforeVmBlocklist: 0,
       enableGpio: false,
       debugConsole: false,
+      savePcmDebug: false,
       greetingVoice: '',
       greetingLengthScale: 1.0,
       logFile: './logs/modem.log',
@@ -240,11 +241,19 @@ export default function SettingsPage() {
 
           <Card shadow="sm" padding="lg" radius="md" withBorder>
             <Title order={4} mb="md">Debugging</Title>
-            <Switch
-              label="Enable Debug Console"
-              description="Shows the Debug Console menu item and allows access to /debug."
-              {...form.getInputProps('debugConsole', { type: 'checkbox' })}
-            />
+            <Stack gap="sm">
+              <Switch
+                label="Enable Debug Console"
+                description="Shows the Debug Console menu item and allows access to /debug."
+                {...form.getInputProps('debugConsole', { type: 'checkbox' })}
+              />
+              <Switch
+                label="Save PCM debug files"
+                description="Keep raw PCM recordings alongside MP3 voicemails. Enables a Download PCM button in the Voicemails page for analysis."
+                disabled={!form.values.debugConsole}
+                {...form.getInputProps('savePcmDebug', { type: 'checkbox' })}
+              />
+            </Stack>
           </Card>
 
           <Card shadow="sm" padding="lg" radius="md" withBorder>

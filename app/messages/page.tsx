@@ -8,7 +8,7 @@ import {
 import { useDebouncedValue } from '@mantine/hooks';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { apiClient } from '@/lib/api-client';
-import type { Message, ListEntry } from '@/lib/contract';
+import type { Message, ListEntry, AppSettings } from '@/lib/contract';
 
 const PAGE_SIZE_OPTIONS = ['10', '20', '50', '100'];
 
@@ -23,6 +23,7 @@ function resolveName(msg: Message, whitelist: ListEntry[]): string {
 export default function MessagesPage() {
   const [messages, setMessages]     = useState<Message[]>([]);
   const [whitelist, setWhitelist]   = useState<ListEntry[]>([]);
+  const [settings, setSettings]     = useState<AppSettings | null>(null);
   const [total, setTotal]           = useState(0);
   const [page, setPage]             = useState(1);
   const [pageSize, setPageSize]     = useState(20);
@@ -34,6 +35,7 @@ export default function MessagesPage() {
 
   useEffect(() => {
     apiClient.whitelist.list({ limit: 10000 }).then(d => setWhitelist(d.rows));
+    apiClient.settings.get().then(s => setSettings(s));
   }, []);
 
   const load = useCallback(() => {
@@ -73,6 +75,16 @@ export default function MessagesPage() {
     if (msg.number) params.set('number', msg.number);
     window.location.href = `/api/messages/download?${params}`;
   };
+
+  const downloadPcm = (msg: Message) => {
+    if (!msg.filename) return;
+    const pcmFilename = msg.filename.replace(/\.[^.]+$/, '.pcm');
+    const params = new URLSearchParams({ filename: pcmFilename });
+    if (msg.number) params.set('number', msg.number);
+    window.location.href = `/api/messages/download?${params}`;
+  };
+
+  const showPcmButton = settings?.debugConsole && settings?.savePcmDebug;
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -169,6 +181,9 @@ export default function MessagesPage() {
                 {msg.filename && (
                   <Button size="xs" variant="light" color="teal" onClick={() => download(msg)}>Download</Button>
                 )}
+                {showPcmButton && msg.hasPcm && (
+                  <Button size="xs" variant="light" color="orange" onClick={() => downloadPcm(msg)}>Download PCM</Button>
+                )}
                 <Button size="xs" variant="light" color="red" onClick={() => deleteMessage(msg.messageId)}>Delete</Button>
               </Group>
             </Box>
@@ -186,6 +201,9 @@ export default function MessagesPage() {
               )}
               {msg.filename && (
                 <Button size="xs" variant="light" color="teal" onClick={() => download(msg)}>Download</Button>
+              )}
+              {msg.filename && showPcmButton && (
+                <Button size="xs" variant="light" color="orange" onClick={() => downloadPcm(msg)}>Download PCM</Button>
               )}
               <Button size="xs" variant="light" color="red" onClick={() => deleteMessage(msg.messageId)}>Delete</Button>
             </Group>

@@ -29,6 +29,7 @@ export const MessageSchema = z.object({
   dateTime:   z.string().nullable(),
   name:       z.string().nullable(),
   number:     z.string().nullable(),
+  hasPcm:     z.boolean(),
 });
 
 export const AppSettingsSchema = z.object({
@@ -44,6 +45,7 @@ export const AppSettingsSchema = z.object({
   autoBlockSpam:          z.boolean(),
   enableGpio:             z.boolean(),
   debugConsole:           z.boolean(),
+  savePcmDebug:           z.boolean(),
   greetingVoice:          z.string(),
   greetingLengthScale:    z.number(),
   logFile:                z.string(),

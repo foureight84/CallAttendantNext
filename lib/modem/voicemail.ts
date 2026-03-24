@@ -17,7 +17,7 @@ export async function ensureMessagesDir(): Promise<void> {
  * Convert raw PCM buffer (8-bit unsigned, 8kHz, mono) to MP3 using ffmpeg.
  * Returns the output MP3 filename (basename only).
  */
-export async function savePcmAsMP3(pcmBuffer: Buffer, callLogId: number, number: string, name: string): Promise<string | null> {
+export async function savePcmAsMP3(pcmBuffer: Buffer, callLogId: number, number: string, name: string, savePcm = false): Promise<string | null> {
   await ensureMessagesDir();
   const trimmed = trimSilence(pcmBuffer);
   // At 8kHz 8-bit mono: 4000 bytes = 0.5 seconds. Anything shorter after
@@ -38,7 +38,7 @@ export async function savePcmAsMP3(pcmBuffer: Buffer, callLogId: number, number:
     const mp3Path = path.join(config.messagesDir, `${baseName}.mp3`);
     await writeFile(pcmPath, trimmed);
     await runFfmpeg(pcmPath, mp3Path);
-    await unlink(pcmPath).catch(() => {});
+    if (!savePcm) await unlink(pcmPath).catch(() => {});
     return `${baseName}.mp3`;
   } catch (err) {
     if ((err as NodeJS.ErrnoException).message?.includes('ffmpeg not found')) {

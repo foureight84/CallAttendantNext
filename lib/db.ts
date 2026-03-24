@@ -349,6 +349,7 @@ export interface AppSettings {
   autoBlockSpam: boolean;
   enableGpio: boolean;
   debugConsole: boolean;
+  savePcmDebug: boolean;
   greetingVoice: string;
   greetingLengthScale: number;
   logFile: string;
@@ -370,6 +371,7 @@ export async function getSettings(): Promise<AppSettings> {
     autoBlockSpam:          (map['autoBlockSpam'] ?? String(config.autoBlockSpam)) === 'true',
     enableGpio:             (map['enableGpio']    ?? String(config.enableGpio))    === 'true',
     debugConsole:           (map['debugConsole']  ?? String(config.debugConsole))  === 'true',
+    savePcmDebug:           (map['savePcmDebug']  ?? String(config.savePcmDebug))  === 'true',
     greetingVoice:          map['greetingVoice']          ?? '',
     greetingLengthScale:    parseFloat(map['greetingLengthScale'] ?? String(config.piperLengthScale)),
     logFile:      map['logFile']      ?? config.logFile,
@@ -396,5 +398,6 @@ export async function seedSettingsFromEnv(): Promise<void> {
     autoBlockSpam: config.autoBlockSpam,
     enableGpio: config.enableGpio,
     debugConsole: config.debugConsole,
+    savePcmDebug: config.savePcmDebug,
   });
 }
