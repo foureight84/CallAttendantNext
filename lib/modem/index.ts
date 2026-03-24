@@ -360,17 +360,19 @@ async function goToVoicemail(callLogId: number, greetingBasename: string, voice:
   await modem.startRecording();
   modemLog('info', 'Recording voicemail...');
 
-  // Wait until caller hangs up (inVoiceMode → false) or 120s timeout
+  // Wait until caller hangs up (inVoiceMode → false) or 120s timeout.
+  // Also exit early if isHandlingCall became false — this happens when the
+  // caller hung up during the beep inside startRecording() (the isOffHook
+  // path emits CALL_END before inVoiceMode is set, so startRecording() can
+  // still enter VRX mode after the caller is already gone).
   let waited = 0;
-  while (modem.isRecording() && waited < 120000) {
+  while (modem.isRecording() && isHandlingCall && waited < 120000) {
     await sleep(500);
     waited += 500;
   }
 
-  // Always send <DLE>! to exit AT+VRX mode — required even when the caller
-  // hung up and the modem already sent <DLE><ETX>. Matches Python's behavior.
   if (modem.isRecording()) {
-    modemLog('info', 'Recording timeout — stopping recording');
+    modemLog('info', waited >= 120000 ? 'Recording timeout — stopping recording' : 'Caller hung up — stopping recording');
   }
   await modem.stopRecording();
 

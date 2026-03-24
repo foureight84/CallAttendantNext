@@ -116,6 +116,7 @@ export class Modem {
 
   private inVoiceMode = false;
   private isOffHook = false;   // true between answer() and hangUp()
+  private dleCarry = false;    // last byte of previous voice chunk was 0x10 (DLE)
   private voiceBuffer: Buffer[] = [];
   private textBuffer = '';
 
@@ -176,6 +177,14 @@ export class Modem {
     const hangupSeqs = HANGUP_SEQS[this.model];
 
     if (this.inVoiceMode) {
+      // Re-attach any DLE byte that was split off the end of the previous chunk.
+      // Serial data can arrive in arbitrary boundaries; without this a hang-up
+      // sequence like [0x10][0x68] split across two chunks would go undetected.
+      if (this.dleCarry) {
+        chunk = Buffer.concat([Buffer.from([0x10]), chunk]);
+        this.dleCarry = false;
+      }
+
       // Check for modem status codes that signal end of recording.
       // Only codes in this modem's HANGUP_SEQS are checked — prevents false
       // positives from voice data bytes that match another modem's DLE codes.
@@ -185,8 +194,18 @@ export class Modem {
           const termIdx = Math.min(...hitIdx);
           if (termIdx > 0) this.voiceBuffer.push(chunk.slice(0, termIdx));
           this.inVoiceMode = false;
+          this.dleCarry = false;
+          const dleCode = chunk[termIdx + 1]?.toString(16).padStart(2, '0') ?? '??';
+          console.log(`[modem] Hang-up DLE code detected during VRX: 0x10 0x${dleCode}`);
           this.emit({ type: 'CALL_END' });
           return;
+        }
+
+        // If the last byte is 0x10, it might be the first half of a split hang-up
+        // sequence — carry it forward to prepend on the next chunk.
+        if (chunk[chunk.length - 1] === 0x10) {
+          this.dleCarry = true;
+          chunk = chunk.slice(0, -1);
         }
       }
       this.voiceBuffer.push(chunk);
@@ -268,8 +287,19 @@ export class Modem {
 
   async initModem(): Promise<void> {
     console.log('[modem] Sending init sequence...');
-    await this.sendCommand('ATZ', 1000);
+
+    // Escape from any voice data mode the modem may be stuck in (e.g. after a
+    // recording session that was aborted uncleanly — modem left in AT+VRX mode).
+    // +++ requires a ≥1s guard time on both sides; if already in command mode
+    // the modem returns ERROR (harmless — we ignore the response).
+    await sleep(1100);
+    await this.writeRaw(Buffer.from('+++'));
+    await sleep(1100);
+
+    await this.sendCommand('ATH0', 500);   // ensure on-hook before full reset
+    await this.sendCommand('ATZ', 1500);   // factory reset (longer delay for MT modems)
     await this.sendCommand('ATE0', 500);
+    await this.sendCommand('AT+FCLASS=0', 500); // explicitly clear voice class before detect
 
     this.model = await this.detectModel();
 
@@ -322,6 +352,7 @@ export class Modem {
     await this.sendCommand('AT+FCLASS=0', 500); // restore command mode after on-hook
     this.inVoiceMode = false;
     this.isOffHook = false;
+    this.dleCarry = false;
     this.voiceBuffer = [];
     this.textBuffer = '';
   }
@@ -400,8 +431,16 @@ export class Modem {
   async stopRecording(): Promise<void> {
     if (!this.port?.isOpen) return;
     this.inVoiceMode = false;
+    this.dleCarry = false;
     await this.writeRaw(END_VOICE_RX[this.model]);
-    await sleep(500);
+    // Belt-and-suspenders for MT9234MU: if <DLE>I doesn't exit VRX cleanly
+    // (firmware quirk), also send the IS-101 standard <DLE>! as a fallback.
+    // If <DLE>I already worked the modem is in command mode and ignores the extra byte.
+    if (this.model === 'MT9234MU') {
+      await sleep(150);
+      await this.writeRaw(Buffer.from([0x10, 0x21]));
+    }
+    await sleep(350);
   }
 
   getRecordedBuffer(): Buffer {
