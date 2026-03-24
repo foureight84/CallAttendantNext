@@ -42,13 +42,12 @@ const END_VOICE_TX: Record<ModemModel, Buffer> = {
 };
 
 // DTE→DCE: end voice receive
-//   USR/UNKNOWN:  <DLE>!  (IS-101 compatible)
-//   CONEXANT:     <DLE><DLE><DLE>!  (triple-DLE required by Conexant)
-//   MT9234MU:     <DLE>I  (MultiTech manual specifies <DLE><I> = 0x49 to abort +VRX)
+//   USR/MT9234MU/UNKNOWN:  <DLE>!  (IS-101 compatible)
+//   CONEXANT:              <DLE><DLE><DLE>!  (triple-DLE required by Conexant)
 const END_VOICE_RX: Record<ModemModel, Buffer> = {
   USR:      Buffer.from([0x10, 0x21]),
   CONEXANT: Buffer.from([0x10, 0x10, 0x10, 0x21]),
-  MT9234MU: Buffer.from([0x10, 0x49]),
+  MT9234MU: Buffer.from([0x10, 0x21]),
   UNKNOWN:  Buffer.from([0x10, 0x21]),
 };
 
@@ -86,21 +85,21 @@ const AUDIO_CHUNK_SLEEP: Record<ModemModel, number> = {
 //   <DLE>H     0x48 — line current detected     USR ✓  CONEXANT ✓  MT9234MU ✓
 //   <DLE>b     0x62 — busy tone                 USR ✓  CONEXANT ✓  MT9234MU ✓
 //   <DLE>d     0x64 — dial tone                 USR ✓  CONEXANT ✓  MT9234MU ✓
-//   <DLE>h     0x68 — line current break        USR ✓  CONEXANT ✓  MT9234MU ✓
-//   <DLE>l     0x6C — loop current interruption USR ✗  CONEXANT ✓  MT9234MU ✓
+//   <DLE>h     0x68 — line current break        USR ✓  CONEXANT ✓  MT9234MU —
+//   <DLE>l     0x6C — loop current interruption USR ✗  CONEXANT ✓  MT9234MU —
 const DCE_END_VOICE_DATA     = Buffer.from([0x10, 0x03]);
 const DCE_PHONE_OFF_HOOK     = Buffer.from([0x10, 0x48]);
 const DCE_BUSY_TONE          = Buffer.from([0x10, 0x62]);
 const DCE_DIAL_TONE          = Buffer.from([0x10, 0x64]);
 const DCE_LINE_CURRENT_BREAK = Buffer.from([0x10, 0x68]);
-const DCE_LOOP_CURRENT_INT   = Buffer.from([0x10, 0x6C]); // NOT sent by USR5637
+const DCE_LOOP_CURRENT_INT   = Buffer.from([0x10, 0x6C]); // NOT sent by USR5637 or MT9234MU
 
 // Per-model hang-up sequences — only codes documented for that modem.
 // Using another modem's codes risks false positives from valid voice data bytes.
 const HANGUP_SEQS: Record<ModemModel, Buffer[]> = {
   USR:      [DCE_END_VOICE_DATA, DCE_PHONE_OFF_HOOK, DCE_LINE_CURRENT_BREAK, DCE_BUSY_TONE, DCE_DIAL_TONE],
   CONEXANT: [DCE_END_VOICE_DATA, DCE_PHONE_OFF_HOOK, DCE_LINE_CURRENT_BREAK, DCE_LOOP_CURRENT_INT, DCE_BUSY_TONE, DCE_DIAL_TONE],
-  MT9234MU: [DCE_END_VOICE_DATA, DCE_PHONE_OFF_HOOK, DCE_LINE_CURRENT_BREAK, DCE_LOOP_CURRENT_INT, DCE_BUSY_TONE, DCE_DIAL_TONE],
+  MT9234MU: [DCE_END_VOICE_DATA, DCE_PHONE_OFF_HOOK, DCE_BUSY_TONE, DCE_DIAL_TONE],
   UNKNOWN:  [DCE_END_VOICE_DATA, DCE_PHONE_OFF_HOOK, DCE_LINE_CURRENT_BREAK, DCE_BUSY_TONE, DCE_DIAL_TONE],
 };
 
@@ -426,21 +425,14 @@ export class Modem {
 
   /**
    * Signal end of voice receive mode to the modem.
-   * Mirrors Python DTE_END_VOICE_DATA_RX: <DLE>! (USR) or <DLE><DLE><DLE>! (Conexant)
+   * Mirrors Python DTE_END_VOICE_DATA_RX: <DLE>! (USR/MT9234MU) or <DLE><DLE><DLE>! (Conexant)
    */
   async stopRecording(): Promise<void> {
     if (!this.port?.isOpen) return;
     this.inVoiceMode = false;
     this.dleCarry = false;
     await this.writeRaw(END_VOICE_RX[this.model]);
-    // Belt-and-suspenders for MT9234MU: if <DLE>I doesn't exit VRX cleanly
-    // (firmware quirk), also send the IS-101 standard <DLE>! as a fallback.
-    // If <DLE>I already worked the modem is in command mode and ignores the extra byte.
-    if (this.model === 'MT9234MU') {
-      await sleep(150);
-      await this.writeRaw(Buffer.from([0x10, 0x21]));
-    }
-    await sleep(350);
+    await sleep(500);
   }
 
   getRecordedBuffer(): Buffer {
