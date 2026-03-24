@@ -366,21 +366,15 @@ async function goToVoicemail(callLogId: number, greetingBasename: string, voice:
   // isHandlingCall before inVoiceMode is set, so startRecording() can still
   // enter VRX mode after the caller is already gone.
   // Silence fallback: some modems (e.g. MT9234MU) don't send DLE hang-up
-  // codes into the VRX stream. Use a state machine: wait for real voice
-  // activity (≥60% non-silent in a 500ms window, after a 2s guard to skip
-  // line-connect transients), then trigger on 8s of sustained silence.
-  const SILENCE_HANGUP_MS = 8000;
+  // codes into the VRX stream. Mirrors the original Python project's approach:
+  // stop after ~5s of consecutive fully-silent audio (all bytes in [126,129]).
+  const SILENCE_HANGUP_MS = 5000;
   let waited = 0;
-  let audioSeen = false;
   let silenceReason = false;
   while (modem.isRecording() && isHandlingCall && waited < 120000) {
     await sleep(500);
     waited += 500;
-    if (!audioSeen && waited >= 2000 && modem.hasRecentVoiceActivity(500, 0.60)) {
-      audioSeen = true;
-      modemLog('info', 'Voice activity detected — silence detection armed');
-    }
-    if (audioSeen && modem.hasSustainedSilence(SILENCE_HANGUP_MS)) {
+    if (modem.hasSustainedSilence(SILENCE_HANGUP_MS)) {
       silenceReason = true;
       break;
     }
@@ -388,7 +382,7 @@ async function goToVoicemail(callLogId: number, greetingBasename: string, voice:
 
   if (modem.isRecording()) {
     if (silenceReason) {
-      modemLog('info', `${SILENCE_HANGUP_MS / 1000}s of silence after voice activity — caller likely hung up, stopping recording`);
+      modemLog('info', `${SILENCE_HANGUP_MS / 1000}s of silence — caller likely hung up, stopping recording`);
     } else if (waited >= 120000) {
       modemLog('info', 'Recording timeout — stopping recording');
     } else {

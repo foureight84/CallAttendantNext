@@ -461,27 +461,4 @@ export class Modem {
     return remaining <= 0;
   }
 
-  /**
-   * Returns true if at least minFraction of the last windowMs milliseconds
-   * of buffered audio consists of non-silent bytes (i.e. real voice activity).
-   * Used to distinguish true caller speech from line-connect transients before
-   * enabling silence-based hang-up detection.
-   * Returns false if less than windowMs of audio has been buffered yet.
-   */
-  hasRecentVoiceActivity(windowMs: number, minFraction = 0.60): boolean {
-    const target = Math.round(windowMs / 1000 * 8000);
-    let remaining = target;
-    let nonSilent = 0;
-    for (let i = this.voiceBuffer.length - 1; i >= 0 && remaining > 0; i--) {
-      const chunk = this.voiceBuffer[i];
-      const start = Math.max(0, chunk.length - remaining);
-      for (let j = chunk.length - 1; j >= start; j--) {
-        const b = chunk[j];
-        if (b < 126 || b > 129) nonSilent++;
-        remaining--;
-      }
-    }
-    // remaining > 0 means buffer shorter than window — not enough data yet
-    return remaining <= 0 && nonSilent / target >= minFraction;
-  }
 }
