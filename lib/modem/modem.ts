@@ -25,11 +25,15 @@ const VOICE_COMPRESSION: Record<ModemModel, string> = {
   UNKNOWN:  'AT+VSM=128,8000',
 };
 
-// AT+VSD: disable silence detection
-const DISABLE_SILENCE_DETECTION: Record<ModemModel, string> = {
+// AT+VSD: silence detection config per modem.
+// MT9234MU: enable hardware silence detection (sds=128 nominal, sdi=50 = 5.0s).
+//   The modem injects <DLE>s (0x10,0x73) "Presumed Hang Up SILENCE" or
+//   <DLE>q (0x10,0x71) "Presumed End of Message QUIET" into the VRX stream.
+//   All other modems: disable (sdi=0) — use software silence detection instead.
+const SILENCE_DETECTION_CMD: Record<ModemModel, string> = {
   USR:      'AT+VSD=128,0',
   CONEXANT: 'AT+VSD=0,0',
-  MT9234MU: 'AT+VSD=128,0',
+  MT9234MU: 'AT+VSD=128,50',  // enable: 5.0s silence → <DLE>s or <DLE>q injected
   UNKNOWN:  'AT+VSD=128,0',
 };
 
@@ -93,13 +97,17 @@ const DCE_BUSY_TONE          = Buffer.from([0x10, 0x62]);
 const DCE_DIAL_TONE          = Buffer.from([0x10, 0x64]);
 const DCE_LINE_CURRENT_BREAK = Buffer.from([0x10, 0x68]);
 const DCE_LOOP_CURRENT_INT   = Buffer.from([0x10, 0x6C]); // NOT sent by USR5637 or MT9234MU
+const DCE_SILENCE_DETECTED   = Buffer.from([0x10, 0x73]); // Event 9: Presumed Hang Up "SILENCE"
+const DCE_QUIET_DETECTED     = Buffer.from([0x10, 0x71]); // Event 10: Presumed End of Message "QUIET"
 
 // Per-model hang-up sequences — only codes documented for that modem.
 // Using another modem's codes risks false positives from valid voice data bytes.
+// MT9234MU includes <DLE>s and <DLE>q which are injected when AT+VSD hardware
+// silence detection fires (see SILENCE_DETECTION_CMD above).
 const HANGUP_SEQS: Record<ModemModel, Buffer[]> = {
   USR:      [DCE_END_VOICE_DATA, DCE_PHONE_OFF_HOOK, DCE_LINE_CURRENT_BREAK, DCE_BUSY_TONE, DCE_DIAL_TONE],
   CONEXANT: [DCE_END_VOICE_DATA, DCE_PHONE_OFF_HOOK, DCE_LINE_CURRENT_BREAK, DCE_LOOP_CURRENT_INT, DCE_BUSY_TONE, DCE_DIAL_TONE],
-  MT9234MU: [DCE_END_VOICE_DATA, DCE_PHONE_OFF_HOOK, DCE_BUSY_TONE, DCE_DIAL_TONE],
+  MT9234MU: [DCE_END_VOICE_DATA, DCE_PHONE_OFF_HOOK, DCE_BUSY_TONE, DCE_DIAL_TONE, DCE_SILENCE_DETECTED, DCE_QUIET_DETECTED],
   UNKNOWN:  [DCE_END_VOICE_DATA, DCE_PHONE_OFF_HOOK, DCE_LINE_CURRENT_BREAK, DCE_BUSY_TONE, DCE_DIAL_TONE],
 };
 
@@ -327,7 +335,7 @@ export class Modem {
    */
   async answer(): Promise<void> {
     await this.sendCommand('AT+FCLASS=8', 500);
-    await this.sendCommand(DISABLE_SILENCE_DETECTION[this.model], 500);
+    await this.sendCommand(SILENCE_DETECTION_CMD[this.model], 500);
     await this.sendCommand('AT+VLS=1', 1000); // TAD off-hook (answers the call)
     this.isOffHook = true;
   }
@@ -413,7 +421,7 @@ export class Modem {
 
     await this.sendCommand('AT+FCLASS=8', 500);
     await this.sendCommand(VOICE_COMPRESSION[this.model], 500);
-    await this.sendCommand(DISABLE_SILENCE_DETECTION[this.model], 500);
+    await this.sendCommand(SILENCE_DETECTION_CMD[this.model], 500);
     const recordGain = RECORD_GAIN[this.model];
     if (recordGain) await this.sendCommand(recordGain, 500);
     await this.sendCommand('AT+VLS=1', 500);

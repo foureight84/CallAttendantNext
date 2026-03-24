@@ -178,7 +178,9 @@ async function waitForScreeningWithTimeout(timeoutMs: number): Promise<boolean> 
 
 async function handleRing(): Promise<void> {
   if (isHandlingCall) {
-    if (isWaitingForRings) scheduleRingTimeout();
+    // Always refresh the ring timeout so it tracks the latest ring,
+    // regardless of whether we are currently in waitForRings().
+    scheduleRingTimeout();
     return;
   }
   ringCount++;
@@ -428,6 +430,12 @@ async function waitForRings(count: number): Promise<void> {
   if (count <= 0) return;
   modemLog('info', `Waiting for ${count} more ring(s)...`);
   isWaitingForRings = true;
+  // Arm a fresh timeout at the start of the wait. If rings stopped before
+  // waitForRings() was entered (e.g. callee answered during screening), the
+  // earlier ring timeout may have already fired harmlessly. Without this, the
+  // loop would run to completion and kick off voicemail even though no further
+  // rings arrived — matching Python's wait_for_rings() abort-on-silence logic.
+  scheduleRingTimeout();
   const waitMs = count * RING_INTERVAL_MS;
   const start = Date.now();
   while (isHandlingCall && Date.now() - start < waitMs) {
