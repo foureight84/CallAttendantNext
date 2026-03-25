@@ -122,8 +122,9 @@ export default function DashboardPage() {
       ));
     }).catch(() => {});
 
-    apiClient.calls.trend(7).then(setWeeklyTrend).catch(() => {});
-    apiClient.calls.trend(30).then(setMonthlyTrend).catch(() => {});
+    const tzOffset = -new Date().getTimezoneOffset();
+    apiClient.calls.trend(7, tzOffset).then(setWeeklyTrend).catch(() => {});
+    apiClient.calls.trend(30, tzOffset).then(setMonthlyTrend).catch(() => {});
     apiClient.calls.top().then(d => { setTopCallers(d.callers); setTopBlocked(d.blocked); }).catch(() => {});
 
     Promise.all([

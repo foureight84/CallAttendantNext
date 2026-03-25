@@ -130,26 +130,35 @@ export async function getTodayStats() {
   return out;
 }
 
-export async function getCallTrend(days = 7): Promise<{ date: string; total: number; blocked: number; permitted: number }[]> {
+export async function getCallTrend(days = 7, tzOffset = 0): Promise<{ date: string; total: number; blocked: number; permitted: number }[]> {
   const start = new Date();
   start.setDate(start.getDate() - days + 1);
   start.setHours(0, 0, 0, 0);
 
+  // Shift UTC timestamps to local time before extracting date so calls are
+  // bucketed on the correct local calendar day, not the UTC day.
+  const modifier = `${tzOffset} minutes`;
+
   const rows = await db.select({
-    date: sql<string>`date(${callLog.systemDateTime})`,
+    date: sql<string>`date(datetime(${callLog.systemDateTime}, ${modifier}))`,
     total: drizzleCount(),
     blocked:   sql<number>`SUM(CASE WHEN ${callLog.action} = 'Blocked'   THEN 1 ELSE 0 END)`,
     permitted: sql<number>`SUM(CASE WHEN ${callLog.action} = 'Permitted' THEN 1 ELSE 0 END)`,
   }).from(callLog)
     .where(gte(callLog.systemDateTime, start.toISOString()))
-    .groupBy(sql`date(${callLog.systemDateTime})`)
-    .orderBy(sql`date(${callLog.systemDateTime})`);
+    .groupBy(sql`date(datetime(${callLog.systemDateTime}, ${modifier}))`)
+    .orderBy(sql`date(datetime(${callLog.systemDateTime}, ${modifier}))`);
 
   const dataMap = new Map(rows.map(r => [r.date, r]));
   return Array.from({ length: days }, (_, i) => {
     const d = new Date(start);
     d.setDate(d.getDate() + i);
-    const dateStr = d.toISOString().split('T')[0]!;
+    // Use local date parts — start was set to local midnight, so getFullYear/Month/Date
+    // give the correct local calendar date regardless of UTC offset.
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
     const row = dataMap.get(dateStr);
     return { date: dateStr, total: row?.total ?? 0, blocked: row ? Number(row.blocked) : 0, permitted: row ? Number(row.permitted) : 0 };
   });

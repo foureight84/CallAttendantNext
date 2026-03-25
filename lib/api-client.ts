@@ -27,8 +27,8 @@ export const apiClient = {
       if (query.endDate)         params.set('endDate',   query.endDate);
       return apiFetch<{ rows: CallLog[]; total: number }>(`/api/calls?${params}`);
     },
-    trend: (days: number) =>
-      apiFetch<{ date: string; total: number; blocked: number; permitted: number }[]>(`/api/calls/trend?days=${days}`),
+    trend: (days: number, tzOffset = 0) =>
+      apiFetch<{ date: string; total: number; blocked: number; permitted: number }[]>(`/api/calls/trend?days=${days}&tzOffset=${tzOffset}`),
     top: () =>
       apiFetch<{ callers: { number: string; name: string | null; count: number }[]; blocked: { number: string; name: string | null; count: number }[] }>('/api/calls/top'),
   },

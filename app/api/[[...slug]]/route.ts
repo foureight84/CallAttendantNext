@@ -23,7 +23,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
 
   if (route === 'calls/trend') {
     const days = Number(searchParams.get('days') ?? 7);
-    return json(await getCallTrend(days));
+    const tzOffset = Number(searchParams.get('tzOffset') ?? 0) || 0;
+    return json(await getCallTrend(days, tzOffset));
   }
 
   if (route === 'calls/top') {
