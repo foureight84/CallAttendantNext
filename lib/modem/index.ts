@@ -250,7 +250,12 @@ async function handleRing(): Promise<void> {
   const resolvedName = await resolveCallerName(name, number);
   callEvents.emit('incoming-call', { callLogId, name: resolvedName, number, date, time, action: screening.action, reason: screening.reason });
 
+  // Keep a local reference — resetCallState() inside goToVoicemail sets
+  // pendingEmailData = null, so the module-level variable is gone by the time
+  // we return here. The local snapshot still points to the same object, and
+  // the voicemail filename is mutated onto it during goToVoicemail.
   pendingEmailData = { action: screening.action, name: resolvedName, number, date, time, reason: screening.reason };
+  const emailSnapshot = pendingEmailData;
 
   if (screening.action === 'Blocked') {
     await handleBlockedCall(callLogId, ringCount, name, number);
@@ -260,10 +265,8 @@ async function handleRing(): Promise<void> {
     await handleScreenedCall(callLogId, ringCount, name, number, screening.immediate);
   }
   callEvents.emit('call-resolved', { action: screening.action, number });
-  if (pendingEmailData) {
-    sendCallEmail(pendingEmailData).catch(() => {});
-    pendingEmailData = null;
-  }
+  sendCallEmail(emailSnapshot).catch(() => {});
+  pendingEmailData = null;
 }
 
 async function handleBlockedCall(callLogId: number, currentRing: number, name: string, number: string): Promise<void> {
