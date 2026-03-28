@@ -266,7 +266,7 @@ export class Modem {
 
       const onData = (chunk: Buffer) => {
         response += chunk.toString('ascii');
-        if (response.includes('OK') || response.includes('ERROR') || response.includes('CONNECT')) {
+        if (response.includes('OK') || response.includes('ERROR') || response.includes('CONNECT') || response.includes('VCON')) {
           clearTimeout(timeout);
           this.port!.removeListener('data', onData);
           resolve(response);
@@ -330,11 +330,14 @@ export class Modem {
   // ─── Call control ─────────────────────────────────────────────────────────
 
   /**
-   * Answer the call: enter voice mode, disable silence detection, go off-hook (TAD mode).
-   * Mirrors Python pick_up(): AT+FCLASS=8 → AT+VSD → AT+VLS=1
+   * Answer the call: configure all voice parameters then go off-hook (TAD mode).
+   * Per USR 5637 manual Example #7: FCLASS=8 → VGT → VSM → VSD → VLS=1
+   * All parameters must be set BEFORE VLS=1 to ensure proper voice mode setup.
    */
   async answer(): Promise<void> {
     await this.sendCommand('AT+FCLASS=8', 500);
+    await this.sendCommand(PLAYBACK_VOLUME[this.model], 500);
+    await this.sendCommand(VOICE_COMPRESSION[this.model], 500);
     await this.sendCommand(SILENCE_DETECTION_CMD[this.model], 500);
     await this.sendCommand('AT+VLS=1', 1000); // TAD off-hook (answers the call)
     this.isOffHook = true;
@@ -373,10 +376,14 @@ export class Modem {
   async playAudio(audioData: Buffer): Promise<void> {
     if (!this.port?.isOpen) return;
 
-    await this.sendCommand('AT+FCLASS=8', 500);
-    await this.sendCommand(VOICE_COMPRESSION[this.model], 500);
-    await this.sendCommand(PLAYBACK_VOLUME[this.model], 500);
-    await this.sendCommand('AT+VLS=1', 500);
+    if (!this.isOffHook) {
+      // Standalone use (not preceded by answer()): configure everything first
+      await this.sendCommand('AT+FCLASS=8', 500);
+      await this.sendCommand(PLAYBACK_VOLUME[this.model], 500);
+      await this.sendCommand(VOICE_COMPRESSION[this.model], 500);
+      await this.sendCommand(SILENCE_DETECTION_CMD[this.model], 500);
+      await this.sendCommand('AT+VLS=1', 1000);
+    }
     await this.sendCommand('AT+VTX', 2000); // modem responds with CONNECT
 
     // Stream audio in 1024-byte chunks with inter-chunk sleep (matches Python)
@@ -398,10 +405,14 @@ export class Modem {
   async playAudioStream(source: AsyncIterable<Buffer>): Promise<void> {
     if (!this.port?.isOpen) return;
 
-    await this.sendCommand('AT+FCLASS=8', 500);
-    await this.sendCommand(VOICE_COMPRESSION[this.model], 500);
-    await this.sendCommand(PLAYBACK_VOLUME[this.model], 500);
-    await this.sendCommand('AT+VLS=1', 500);
+    if (!this.isOffHook) {
+      // Standalone use (not preceded by answer()): configure everything first
+      await this.sendCommand('AT+FCLASS=8', 500);
+      await this.sendCommand(PLAYBACK_VOLUME[this.model], 500);
+      await this.sendCommand(VOICE_COMPRESSION[this.model], 500);
+      await this.sendCommand(SILENCE_DETECTION_CMD[this.model], 500);
+      await this.sendCommand('AT+VLS=1', 1000);
+    }
     await this.sendCommand('AT+VTX', 2000);
 
     for await (const chunk of source) {
@@ -414,17 +425,22 @@ export class Modem {
 
   /**
    * Start recording voicemail.
-   * Mirrors Python record_audio(): AT+FCLASS=8 → AT+VSM → AT+VSD → AT+VLS=1 → AT+VTS beep → AT+VRX (CONNECT)
+   * Per USR manual Example #7: after answer()+playAudioStream(), modem is still off-hook.
+   * Only VSD and VGR need to be (re)applied before VRX; VSM and VGT were set in answer().
+   * If called standalone (no prior answer()), configure everything from scratch.
    */
   async startRecording(): Promise<void> {
     this.voiceBuffer = [];
 
-    await this.sendCommand('AT+FCLASS=8', 500);
-    await this.sendCommand(VOICE_COMPRESSION[this.model], 500);
+    if (!this.isOffHook) {
+      await this.sendCommand('AT+FCLASS=8', 500);
+      await this.sendCommand(PLAYBACK_VOLUME[this.model], 500);
+      await this.sendCommand(VOICE_COMPRESSION[this.model], 500);
+      await this.sendCommand('AT+VLS=1', 1000);
+    }
     await this.sendCommand(SILENCE_DETECTION_CMD[this.model], 500);
     const recordGain = RECORD_GAIN[this.model];
     if (recordGain) await this.sendCommand(recordGain, 500);
-    await this.sendCommand('AT+VLS=1', 500);
     await this.sendCommand('AT+VTS=[900,900,120]', 2000); // 1.2 second beep
 
     this.inVoiceMode = true; // set before VRX so incoming voice data is captured
