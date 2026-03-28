@@ -95,10 +95,12 @@ export async function startDaemon(): Promise<void> {
     try {
       switch (event.type) {
         case 'RING':
+          callEvents.emit('RING');
           await handleRing();
           break;
         case 'CALLER_ID':
           currentCallInfo = event.info;
+          callEvents.emit('CALLER_ID', event.info);
           modemLog('info', `Caller ID: name="${event.info.name ?? 'unknown'}" number="${event.info.number ?? 'unknown'}"`);
           modemLog('info', `Screening caller: ${event.info.name ?? 'UNKNOWN'} <${event.info.number ?? 'UNKNOWN'}>...`);
           screeningPromise = screenCaller(event.info.name ?? 'UNKNOWN', event.info.number ?? 'UNKNOWN').catch(err => {
@@ -108,6 +110,7 @@ export async function startDaemon(): Promise<void> {
           kickOffPreSynthesis().catch(() => {});
           break;
         case 'CALL_END':
+          callEvents.emit('CALL_END');
           await handleCallEnd();
           break;
         case 'VOICE_DATA':
@@ -345,6 +348,7 @@ async function goToVoicemail(callLogId: number, greetingBasename: string, voice:
       modemLog('info', 'Synthesizing please_leave_message via TTS');
       await modem.playAudioStream(synthesize(pleaseLeaveText, resolveModelPath(voice), lengthScale));
     }
+    callEvents.emit('greeting-played');
   } catch (err) {
     modemLog('warn', `Could not play greeting: ${err}`);
   }
@@ -361,6 +365,7 @@ async function goToVoicemail(callLogId: number, greetingBasename: string, voice:
   modemLog('info', 'Starting recording — playing beep (AT+VTS=[900,900,120]) then AT+VRX...');
   await modem.startRecording();
   modemLog('info', 'Recording voicemail...');
+  callEvents.emit('recording-started');
 
   // Wait until caller hangs up (inVoiceMode → false via DLE code) or 120s timeout.
   // Also check isHandlingCall: if the caller hung up during the beep inside
