@@ -51,11 +51,12 @@ export async function sendCallEmail(data: CallEmailData): Promise<void> {
 
   if (!s.emailEnabled || !s.emailHost || !s.emailUser || !s.emailPass || !s.emailTo) return;
 
-  // Check notification preferences
-  if (data.voicemailFilename && !s.emailNotifyVoicemail && !s.emailNotifyAll) return;
-  if (data.action === 'Blocked' && !s.emailNotifyBlocked && !s.emailNotifyAll) return;
-  if (data.action === 'Screened' && !s.emailNotifyAll) return;
-  if (data.action === 'Permitted' && !s.emailNotifyAll && !s.emailNotifyVoicemail) return;
+  // Send if any enabled notification condition matches.
+  const shouldSend =
+    s.emailNotifyAll ||
+    (s.emailNotifyVoicemail && !!data.voicemailFilename) ||
+    (s.emailNotifyBlocked  && data.action === 'Blocked');
+  if (!shouldSend) return;
 
   const from = s.emailFrom || s.emailUser;
   const transport = buildTransport(s.emailHost, s.emailPort, s.emailUser, s.emailPass);
