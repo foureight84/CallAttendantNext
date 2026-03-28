@@ -4,6 +4,7 @@ import { savePcmAsMP3, ensureMessagesDir, readScriptFile } from './voicemail';
 import { synthesize } from './tts';
 import { insertCallLog, insertMessage, getSettings, isWhitelisted, isBlacklisted } from '../db';
 import { callEvents, modemLog } from '../events';
+import { sendCallEmail } from '../email';
 import { config } from '../config';
 import path from 'path';
 import { blinkLed, GPIO_PINS } from './gpio';
@@ -30,6 +31,8 @@ let screeningPromise: Promise<{ action: 'Blocked' | 'Permitted' | 'Screened'; re
 let ringTimeoutId: ReturnType<typeof setTimeout> | null = null;
 let preSynthesizedGreeting: Buffer[] | null = null;
 let preSynthesizedPleaseLeave: Buffer[] | null = null;
+// Tracks the current call's details for email notification sent on call-resolved.
+let pendingEmailData: { action: 'Permitted' | 'Blocked' | 'Screened'; name: string; number: string; date: string; time: string; reason: string; voicemailFilename?: string } | null = null;
 
 function scheduleRingTimeout(): void {
   if (ringTimeoutId !== null) clearTimeout(ringTimeoutId);
@@ -247,6 +250,8 @@ async function handleRing(): Promise<void> {
   const resolvedName = await resolveCallerName(name, number);
   callEvents.emit('incoming-call', { callLogId, name: resolvedName, number, date, time, action: screening.action, reason: screening.reason });
 
+  pendingEmailData = { action: screening.action, name: resolvedName, number, date, time, reason: screening.reason };
+
   if (screening.action === 'Blocked') {
     await handleBlockedCall(callLogId, ringCount, name, number);
   } else if (screening.action === 'Permitted') {
@@ -255,6 +260,10 @@ async function handleRing(): Promise<void> {
     await handleScreenedCall(callLogId, ringCount, name, number, screening.immediate);
   }
   callEvents.emit('call-resolved', { action: screening.action, number });
+  if (pendingEmailData) {
+    sendCallEmail(pendingEmailData).catch(() => {});
+    pendingEmailData = null;
+  }
 }
 
 async function handleBlockedCall(callLogId: number, currentRing: number, name: string, number: string): Promise<void> {
@@ -411,6 +420,7 @@ async function goToVoicemail(callLogId: number, greetingBasename: string, voice:
         await insertMessage({ CallLogID: callLogId, Played: 0, Filename: filename, DateTime: new Date().toISOString() });
         modemLog('info', `Voicemail saved: ${filename}`);
         callEvents.emit('new-voicemail', { callLogId, filename });
+        if (pendingEmailData) pendingEmailData.voicemailFilename = filename;
       } else {
         modemLog('info', 'Recording discarded — insufficient audio content after trimming');
       }
@@ -459,6 +469,7 @@ function resetCallState(): void {
   screeningPromise = null;
   preSynthesizedGreeting = null;
   preSynthesizedPleaseLeave = null;
+  pendingEmailData = null;
   if (ringTimeoutId !== null) {
     clearTimeout(ringTimeoutId);
     ringTimeoutId = null;

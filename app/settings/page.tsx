@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Stack, Title, Card, Group, Text, Button, Slider, NumberInput, Switch, Select, MultiSelect, Divider, Radio, TextInput, Box, Anchor } from '@mantine/core';
+import { Stack, Title, Card, Group, Text, Button, Slider, NumberInput, Switch, Select, MultiSelect, Divider, Radio, TextInput, Box, Anchor, Tabs, Code, PasswordInput, Alert } from '@mantine/core';
 import Link from 'next/link';
 import { notifications } from '@mantine/notifications';
 import { useForm } from '@mantine/form';
@@ -12,6 +12,8 @@ export default function SettingsPage() {
   const [models, setModels] = useState<string[]>([]);
   const [previewText, setPreviewText] = useState('Hello, this is a test of the voice synthesis system.');
   const [previewing, setPreviewing] = useState(false);
+  const [testingEmail, setTestingEmail] = useState(false);
+  const [emailTestResult, setEmailTestResult] = useState<{ ok: boolean; error?: string } | null>(null);
 
   const form = useForm<AppSettings>({
     initialValues: {
@@ -34,6 +36,16 @@ export default function SettingsPage() {
       logFile: './logs/modem.log',
       logMaxBytes: 5 * 1024 * 1024,
       logKeepFiles: 2,
+      emailEnabled: false,
+      emailHost: '',
+      emailPort: 587,
+      emailUser: '',
+      emailPass: '',
+      emailFrom: '',
+      emailTo: '',
+      emailNotifyVoicemail: true,
+      emailNotifyBlocked: false,
+      emailNotifyAll: false,
     },
   });
 
@@ -59,6 +71,23 @@ export default function SettingsPage() {
       notifications.show({ title: 'Preview failed', message: String(err), color: 'red', autoClose: 4000 });
     } finally {
       setPreviewing(false);
+    }
+  };
+
+  const handleTestEmail = async () => {
+    setTestingEmail(true);
+    setEmailTestResult(null);
+    try {
+      // Save current email settings first so the test uses them
+      const { serialPort: _sp, serialBaudRate: _sbr, ...saveable } = form.values;
+      await apiClient.settings.save(saveable);
+      const res = await fetch('/api/email/test', { method: 'POST' });
+      const data = await res.json() as { ok: boolean; error?: string };
+      setEmailTestResult(data);
+    } catch (err) {
+      setEmailTestResult({ ok: false, error: String(err) });
+    } finally {
+      setTestingEmail(false);
     }
   };
 
@@ -230,6 +259,124 @@ export default function SettingsPage() {
                 disabled={form.values.blocklistAction !== 3}
                 {...form.getInputProps('ringsBeforeVmBlocklist')}
               />
+            </Stack>
+          </Card>
+
+          <Card shadow="sm" padding="lg" radius="md" withBorder>
+            <Title order={4} mb="md">Email Notifications</Title>
+            <Stack gap="sm">
+              <Switch
+                label="Enable email notifications"
+                {...form.getInputProps('emailEnabled', { type: 'checkbox' })}
+              />
+
+              <Tabs defaultValue="gmail">
+                <Tabs.List>
+                  <Tabs.Tab value="gmail">Gmail</Tabs.Tab>
+                  <Tabs.Tab value="outlook">Outlook</Tabs.Tab>
+                  <Tabs.Tab value="icloud">iCloud</Tabs.Tab>
+                  <Tabs.Tab value="custom">Custom SMTP</Tabs.Tab>
+                </Tabs.List>
+
+                <Tabs.Panel value="gmail" pt="xs">
+                  <Stack gap={4}>
+                    <Text size="sm">1. Enable <strong>2-Step Verification</strong> on your Google account.</Text>
+                    <Text size="sm">2. Go to <Anchor href="https://myaccount.google.com/apppasswords" target="_blank" size="sm">myaccount.google.com/apppasswords</Anchor> and create an App Password.</Text>
+                    <Text size="sm">3. Use these settings:</Text>
+                    <Code block>Host: smtp.gmail.com{'\n'}Port: 587{'\n'}User: you@gmail.com{'\n'}Pass: (16-char app password)</Code>
+                  </Stack>
+                </Tabs.Panel>
+
+                <Tabs.Panel value="outlook" pt="xs">
+                  <Stack gap={4}>
+                    <Text size="sm">Works with Outlook.com, Hotmail, and Microsoft 365 accounts.</Text>
+                    <Text size="sm">Use your regular Microsoft account password (or an app password if MFA is enabled).</Text>
+                    <Text size="sm">Settings:</Text>
+                    <Code block>Host: smtp-mail.outlook.com{'\n'}Port: 587{'\n'}User: you@outlook.com{'\n'}Pass: your password</Code>
+                    <Text size="xs" c="dimmed">For Microsoft 365 / work accounts, your admin may need to enable SMTP AUTH.</Text>
+                  </Stack>
+                </Tabs.Panel>
+
+                <Tabs.Panel value="icloud" pt="xs">
+                  <Stack gap={4}>
+                    <Text size="sm">1. Enable <strong>two-factor authentication</strong> on your Apple ID.</Text>
+                    <Text size="sm">2. Go to <Anchor href="https://appleid.apple.com" target="_blank" size="sm">appleid.apple.com</Anchor> → Sign-In and Security → App-Specific Passwords.</Text>
+                    <Text size="sm">3. Generate an app-specific password and use these settings:</Text>
+                    <Code block>Host: smtp.mail.me.com{'\n'}Port: 587{'\n'}User: you@icloud.com{'\n'}Pass: (app-specific password)</Code>
+                  </Stack>
+                </Tabs.Panel>
+
+                <Tabs.Panel value="custom" pt="xs">
+                  <Text size="sm">Enter your mail provider&apos;s SMTP settings below. Port 587 uses STARTTLS; port 465 uses SSL.</Text>
+                </Tabs.Panel>
+              </Tabs>
+
+              <Divider />
+
+              <Group grow align="flex-end">
+                <TextInput
+                  label="SMTP Host"
+                  placeholder="smtp.gmail.com"
+                  {...form.getInputProps('emailHost')}
+                />
+                <NumberInput
+                  label="Port"
+                  style={{ maxWidth: 100 }}
+                  min={1}
+                  max={65535}
+                  {...form.getInputProps('emailPort')}
+                />
+              </Group>
+              <TextInput
+                label="Username"
+                placeholder="you@gmail.com"
+                {...form.getInputProps('emailUser')}
+              />
+              <PasswordInput
+                label="Password / App Password"
+                {...form.getInputProps('emailPass')}
+              />
+              <TextInput
+                label="From address"
+                description="Defaults to Username if left blank."
+                placeholder="you@gmail.com"
+                {...form.getInputProps('emailFrom')}
+              />
+              <TextInput
+                label="Send notifications to"
+                placeholder="you@gmail.com"
+                {...form.getInputProps('emailTo')}
+              />
+
+              <Divider label="Notify on" labelPosition="left" />
+              <Switch
+                label="Voicemail received"
+                {...form.getInputProps('emailNotifyVoicemail', { type: 'checkbox' })}
+              />
+              <Switch
+                label="Blocked call"
+                {...form.getInputProps('emailNotifyBlocked', { type: 'checkbox' })}
+              />
+              <Switch
+                label="All calls (permitted, screened, blocked)"
+                {...form.getInputProps('emailNotifyAll', { type: 'checkbox' })}
+              />
+
+              <Group>
+                <Button
+                  variant="default"
+                  loading={testingEmail}
+                  disabled={!form.values.emailHost || !form.values.emailUser || !form.values.emailPass || !form.values.emailTo}
+                  onClick={handleTestEmail}
+                >
+                  Send test email
+                </Button>
+                {emailTestResult && (
+                  <Alert color={emailTestResult.ok ? 'green' : 'red'} p="xs" style={{ flex: 1 }}>
+                    {emailTestResult.ok ? 'Test email sent successfully.' : `Failed: ${emailTestResult.error}`}
+                  </Alert>
+                )}
+              </Group>
             </Stack>
           </Card>
 
