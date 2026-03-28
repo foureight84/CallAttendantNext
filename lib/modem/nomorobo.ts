@@ -39,7 +39,7 @@ export async function checkNomorobo(phoneNumber: string): Promise<NomoroboResult
 
     const BLOCK_TYPES = ['Robocall', 'Telemarketer', 'Political', 'Scam', 'Debt Collector', 'Do Not Answer'];
 
-    if (BLOCK_TYPES.some(t => t.toLowerCase() === position.toLowerCase())) {
+    if (BLOCK_TYPES.some(t => position.toLowerCase().includes(t.toLowerCase()))) {
       return { score: 2, reason: `Nomorobo: ${position}` };
     }
 
