@@ -76,6 +76,7 @@ export function AppProviders({ children, colorScheme }: { children: React.ReactN
   const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState(0);
   const [debugConsole, setDebugConsole] = useState(false);
+  const [diagnosticMode, setDiagnosticMode] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [opened, { toggle, close }] = useDisclosure();
 
@@ -84,7 +85,10 @@ export function AppProviders({ children, colorScheme }: { children: React.ReactN
     apiClient.messages.unread().then(d => setUnreadCount(d.count));
 
     const fetchDebugConsole = () =>
-      apiClient.settings.get().then(s => setDebugConsole(s.debugConsole)).catch(() => {});
+      apiClient.settings.get().then(s => {
+        setDebugConsole(s.debugConsole);
+        setDiagnosticMode(s.diagnosticMode);
+      }).catch(() => {});
     fetchDebugConsole();
     window.addEventListener('settings-saved', fetchDebugConsole);
 
@@ -111,8 +115,8 @@ export function AppProviders({ children, colorScheme }: { children: React.ReactN
     { href: '/whitelist', label: 'Phonebook',    icon: IconAddressBook },
     { href: '/blacklist', label: 'Blocklist',    icon: IconBan },
     { href: '/settings',    label: 'Settings',      icon: IconSettings },
-    { href: '/diagnostic',  label: 'Diagnostics',   icon: IconStethoscope },
     ...(debugConsole ? [{ href: '/debug', label: 'Debug Console', icon: IconBug }] : []),
+    ...(diagnosticMode ? [{ href: '/diagnostic', label: 'Diagnostics', icon: IconStethoscope }] : []),
   ];
 
   return (

@@ -1,6 +1,6 @@
 import { callEvents, modemLog } from './events';
 import { getModem } from './modem/index';
-import { addToBlacklist, removeFromBlacklist, addToWhitelist, removeFromWhitelist } from './db';
+import { addToBlacklist, removeFromBlacklist, addToWhitelist, removeFromWhitelist, getSettings, saveSettings } from './db';
 import { config } from './config';
 import fs from 'fs';
 import path from 'path';
@@ -139,7 +139,9 @@ function advanceTo(id: string): void {
 }
 
 let ringTimeout: ReturnType<typeof setTimeout> | null = null;
-let callPhase: 'idle' | 'first-call' | 'blocklist-call' | 'whitelist-call' = 'idle';
+let callPhase: 'idle' | 'first-call' | 'blocklist-call' | 'awaiting-whitelist' | 'whitelist-call' = 'idle';
+// Settings overridden during screening tests — restored after each test resolves or on reset.
+let savedScreeningSettings: { blocklistAction?: number; ringsBeforeVmBlocklist?: number; ringsBeforeVm?: number } | null = null;
 
 function clearRingTimeout(): void {
   if (ringTimeout !== null) {
@@ -266,13 +268,24 @@ function attachListeners(): void {
         }, 10_000);
       }
     } else if (callPhase === 'blocklist-call') {
-      // clean up temp blacklist entry
+      // Blocked call ended without going through incoming-call (caller hung up early).
+      const test = state.tests.find(t => t.id === 'blocklist-screening');
+      if (test?.status === 'running') {
+        setTestStatus('blocklist-screening', 'fail', 'Call ended before screening result');
+      }
       const num = state.detectedNumber;
       if (num) removeFromBlacklist(num).catch(() => {});
+      restoreScreeningSettings().catch(() => {});
+      callPhase = 'idle';
     } else if (callPhase === 'whitelist-call') {
-      // clean up temp whitelist entry
+      // Whitelist call ended before screening result (caller hung up early).
+      const test = state.tests.find(t => t.id === 'whitelist-screening');
+      if (test?.status === 'running') {
+        setTestStatus('whitelist-screening', 'fail', 'Call ended before screening result');
+      }
       const num = state.detectedNumber;
       if (num) removeFromWhitelist(num).catch(() => {});
+      restoreScreeningSettings().catch(() => {});
       callPhase = 'idle';
     }
   });
@@ -300,6 +313,21 @@ function attachListeners(): void {
     }
   });
 
+  callEvents.on('call-resolved', (data: { action?: string }) => {
+    const state = globalThis.__diagnosticState;
+    if (!state.sessionId) return;
+    if (callPhase === 'awaiting-whitelist') {
+      // Blocklist call fully resolved — restore blocklist settings, then start whitelist test.
+      // Restore happens first so startWhitelistTest() saves a clean ringsBeforeVm value.
+      restoreScreeningSettings()
+        .then(() => startWhitelistTest())
+        .catch(err => modemLog('error', `[Diagnostic] ${err}`));
+    } else if (callPhase === 'idle' && data?.action === 'Permitted') {
+      // Whitelist call fully resolved — restore whitelist settings.
+      restoreScreeningSettings().catch(err => modemLog('error', `[Diagnostic] ${err}`));
+    }
+  });
+
   callEvents.on('incoming-call', (data: { action?: string; number?: string }) => {
     const state = globalThis.__diagnosticState;
     if (!state.sessionId) return;
@@ -315,11 +343,14 @@ function attachListeners(): void {
           setTestStatus('blocklist-screening', 'fail', `Expected Blocked, got ${data.action}`);
           modemLog('warn', `[Diagnostic] Blocklist screening failed — action was ${data.action}`);
         }
-        // Remove from blacklist immediately after screening result
+        // Remove from blacklist immediately after screening result.
+        // Set phase to 'awaiting-whitelist' so the CALL_END for this blocked call
+        // starts the whitelist test — avoids a race where startWhitelistTest() sets
+        // callPhase = 'whitelist-call' before the blocked call's CALL_END fires,
+        // causing the CALL_END handler to incorrectly remove the new whitelist entry.
         const num = state.detectedNumber;
         if (num) removeFromBlacklist(num).catch(() => {});
-        callPhase = 'idle';
-        startWhitelistTest().catch(err => modemLog('error', `[Diagnostic] ${err}`));
+        callPhase = 'awaiting-whitelist';
       }
     } else if (callPhase === 'whitelist-call') {
       const test = state.tests.find(t => t.id === 'whitelist-screening');
@@ -342,10 +373,30 @@ function attachListeners(): void {
   });
 }
 
+async function restoreScreeningSettings(): Promise<void> {
+  if (!savedScreeningSettings) return;
+  await saveSettings(savedScreeningSettings).catch(err => modemLog('error', `[Diagnostic] Failed to restore settings: ${err}`));
+  modemLog('info', `[Diagnostic] Restored settings: ${JSON.stringify(savedScreeningSettings)}`);
+  savedScreeningSettings = null;
+}
+
 async function startBlocklistTest(): Promise<void> {
   const state = globalThis.__diagnosticState;
   callPhase = 'blocklist-call';
   advanceTo('blocklist-screening');
+  // Override blocklist settings to action=2 (play greeting + hang up) for a fast, predictable test.
+  // Saves originals so they can be restored after the test.
+  try {
+    const current = await getSettings();
+    savedScreeningSettings = {
+      blocklistAction: current.blocklistAction,
+      ringsBeforeVmBlocklist: current.ringsBeforeVmBlocklist,
+    };
+    await saveSettings({ blocklistAction: 2, ringsBeforeVmBlocklist: 0 });
+    modemLog('info', `[Diagnostic] Overriding blocklistAction→2, ringsBeforeVmBlocklist→0 (was ${current.blocklistAction}, ${current.ringsBeforeVmBlocklist})`);
+  } catch (err) {
+    modemLog('warn', `[Diagnostic] Could not override blocklist settings: ${err}`);
+  }
   const num = state.detectedNumber;
   if (num) {
     await addToBlacklist({ phoneNo: num, name: state.detectedName ?? null, reason: 'Diagnostic test — auto-removed after call' });
@@ -358,6 +409,16 @@ async function startWhitelistTest(): Promise<void> {
   const state = globalThis.__diagnosticState;
   callPhase = 'whitelist-call';
   advanceTo('whitelist-screening');
+  // Override ringsBeforeVm=1 so the system answers after 1 ring — keeps the test fast.
+  // Merges into savedScreeningSettings so a single restoreScreeningSettings() call restores both tests.
+  try {
+    const current = await getSettings();
+    savedScreeningSettings = { ...savedScreeningSettings, ringsBeforeVm: current.ringsBeforeVm };
+    await saveSettings({ ringsBeforeVm: 1 });
+    modemLog('info', `[Diagnostic] Overriding ringsBeforeVm→1 (was ${current.ringsBeforeVm})`);
+  } catch (err) {
+    modemLog('warn', `[Diagnostic] Could not override whitelist settings: ${err}`);
+  }
   const num = state.detectedNumber;
   if (num) {
     await addToWhitelist({ phoneNo: num, name: state.detectedName ?? null, reason: 'Diagnostic test — auto-removed after call' });
@@ -417,6 +478,8 @@ export function resetDiagnostic(): DiagnosticState {
     removeFromBlacklist(old.detectedNumber).catch(() => {});
     removeFromWhitelist(old.detectedNumber).catch(() => {});
   }
+  // Restore any overridden settings
+  restoreScreeningSettings().catch(() => {});
   globalThis.__diagnosticState = initialState();
   broadcastState();
   modemLog('info', '[Diagnostic] Session reset');

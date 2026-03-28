@@ -6,11 +6,11 @@ A TypeScript/Next.js port of the [callattendant](https://github.com/emxsys/calla
 
 **Only hardware modems are supported.** Software modems (winmodems) will not work as they lack the voice mode capabilities required for call screening and audio playback.
 
-| Modem | Recommended Baud Rate |
-|-------|-----------------------|
-| US Robotics USR5637 | 57600 |
-| MultiTech MT9234MU-CDC | 115200 — provides best voice quality |
-| ZOOM 3095 | 115200 — provides best voice quality |
+| Modem | Recommended Baud Rate | Notes |
+|-------|-----------------------|-------|
+| US Robotics USR5637 | 115200 | Requires firmware **1.2.23 or later** (check with `ATI7`). Older firmware cannot answer calls — the modem does not go off-hook in response to `AT+VLS=1`. Update via the [USR support page](https://www.usr.com/support/5637) if needed. |
+| MultiTech MT9234MU-CDC | 115200 — provides best voice quality | |
+| ZOOM 3095 | 115200 — provides best voice quality | |
 
 If you have a hardware modem not on this list and would like support added, open an issue at [foureight84/CallAttendantNext](https://github.com/foureight84/CallAttendantNext/issues).
 
@@ -54,7 +54,7 @@ cp .env.example .env
 | Key | Description |
 |-----|-------------|
 | `SERIAL_PORT` | Path to your modem device (e.g. `/dev/ttyUSB0`, `/dev/tty.usbmodem*`, `COM3`) |
-| `SERIAL_BAUD_RATE` | Modem baud rate — `115200` for ZOOM 3095 and MultiTech MT9234MU-CDC (best voice quality); `57600` for US Robotics USR5637 |
+| `SERIAL_BAUD_RATE` | Modem baud rate — `115200` for all supported modems |
 
 All other keys are optional and fall back to sensible defaults.
 

@@ -76,6 +76,7 @@ export async function startDaemon(): Promise<void> {
   try {
     const { Modem } = await import('./modem');
     globalThis.__modemInstance = new Modem();
+    globalThis.__modemInstance.onLog = (msg) => modemLog('info', msg);
     await globalThis.__modemInstance.open();
     const model = globalThis.__modemInstance.model;
     const modelNames: Record<string, string> = {
@@ -253,6 +254,7 @@ async function handleRing(): Promise<void> {
   } else {
     await handleScreenedCall(callLogId, ringCount, name, number, screening.immediate);
   }
+  callEvents.emit('call-resolved', { action: screening.action, number });
 }
 
 async function handleBlockedCall(callLogId: number, currentRing: number, name: string, number: string): Promise<void> {
@@ -362,7 +364,7 @@ async function goToVoicemail(callLogId: number, greetingBasename: string, voice:
     return;
   }
 
-  modemLog('info', 'Starting recording — playing beep (AT+VTS=[900,900,120]) then AT+VRX...');
+  modemLog('info', 'Starting recording — playing beep then AT+VRX...');
   await modem.startRecording();
   modemLog('info', 'Recording voicemail...');
   callEvents.emit('recording-started');

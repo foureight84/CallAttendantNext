@@ -358,6 +358,7 @@ export interface AppSettings {
   autoBlockSpam: boolean;
   enableGpio: boolean;
   debugConsole: boolean;
+  diagnosticMode: boolean;
   savePcmDebug: boolean;
   greetingVoice: string;
   greetingLengthScale: number;
@@ -379,8 +380,9 @@ export async function getSettings(): Promise<AppSettings> {
     ringsBeforeVmBlocklist: parseInt(map['ringsBeforeVmBlocklist']  ?? String(config.ringsBeforeVmBlocklist),  10),
     autoBlockSpam:          (map['autoBlockSpam'] ?? String(config.autoBlockSpam)) === 'true',
     enableGpio:             (map['enableGpio']    ?? String(config.enableGpio))    === 'true',
-    debugConsole:           (map['debugConsole']  ?? String(config.debugConsole))  === 'true',
-    savePcmDebug:           (map['savePcmDebug']  ?? String(config.savePcmDebug))  === 'true',
+    debugConsole:           (map['debugConsole']    ?? String(config.debugConsole))    === 'true',
+    diagnosticMode:         (map['diagnosticMode']  ?? String(config.diagnosticMode))  === 'true',
+    savePcmDebug:           (map['savePcmDebug']    ?? String(config.savePcmDebug))    === 'true',
     greetingVoice:          map['greetingVoice']          ?? '',
     greetingLengthScale:    parseFloat(map['greetingLengthScale'] ?? String(config.piperLengthScale)),
     logFile:      map['logFile']      ?? config.logFile,
@@ -407,6 +409,7 @@ export async function seedSettingsFromEnv(): Promise<void> {
     autoBlockSpam: config.autoBlockSpam,
     enableGpio: config.enableGpio,
     debugConsole: config.debugConsole,
+    diagnosticMode: config.diagnosticMode,
     savePcmDebug: config.savePcmDebug,
   });
 }

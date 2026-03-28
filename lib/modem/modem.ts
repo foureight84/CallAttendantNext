@@ -25,16 +25,56 @@ const VOICE_COMPRESSION: Record<ModemModel, string> = {
   UNKNOWN:  'AT+VSM=128,8000',
 };
 
-// AT+VSD: silence detection config per modem.
-// MT9234MU: enable hardware silence detection (sds=128 nominal, sdi=50 = 5.0s).
-//   The modem injects <DLE>s (0x10,0x73) "Presumed Hang Up SILENCE" or
-//   <DLE>q (0x10,0x71) "Presumed End of Message QUIET" into the VRX stream.
-//   All other modems: disable (sdi=0) — use software silence detection instead.
+// AT+VSD: silence detection config per modem — two variants needed:
+//
+// ANSWER phase (during greeting playback): disable silence detection so the
+//   modem does not inject <DLE>s mid-greeting.
+//   USR manual Example #7: AT+VSD=128,0 before AT+VLS=1.
+//
+// RECORD phase (during AT+VRX): enable hardware silence detection so the modem
+//   injects <DLE>s when caller goes silent, triggering hang-up detection.
+//   USR manual Example #7: AT+VSD=128,50 before AT+VRX (5.0s silence interval).
+//   MT9234MU: same (128,50) — hardware silence detection always used for VRX.
+//   CONEXANT: keep disabled (0,0) — use software silence detection instead.
 const SILENCE_DETECTION_CMD: Record<ModemModel, string> = {
-  USR:      'AT+VSD=128,0',
+  USR:      'AT+VSD=128,0',   // disabled during answer/greeting
   CONEXANT: 'AT+VSD=0,0',
-  MT9234MU: 'AT+VSD=128,50',  // enable: 5.0s silence → <DLE>s or <DLE>q injected
+  MT9234MU: 'AT+VSD=128,50',
   UNKNOWN:  'AT+VSD=128,0',
+};
+
+// AT+VSD to apply immediately before AT+VRX (recording phase).
+// USR new firmware manual Example #7: AT+VSD=128,50 before AT+VRX — enables
+//   hardware silence detection (5.0s interval) so modem injects <DLE>s on silence.
+// MT9234MU: same (128,50).
+// CONEXANT: keep disabled (0,0) — software silence detection only.
+const SILENCE_DETECTION_RECORD_CMD: Record<ModemModel, string> = {
+  USR:      'AT+VSD=128,50',  // new firmware Example #7: enable 5s hardware silence
+  CONEXANT: 'AT+VSD=0,0',    // keep disabled; software silence detection only
+  MT9234MU: 'AT+VSD=128,50', // enable hardware silence detection
+  UNKNOWN:  'AT+VSD=128,0',
+};
+
+// Whether to re-send the full voice setup before each audio operation even when
+// already off-hook. New USR firmware maintains state between operations — no need
+// to re-send VLS=1 multiple times (Example #7 sends it only once to answer).
+const RESEND_SETUP_PER_OP: Record<ModemModel, boolean> = {
+  USR:      false,
+  CONEXANT: false,
+  MT9234MU: false,
+  UNKNOWN:  false,
+};
+
+// AT+VLS to switch to before AT+VRX (recording phase).
+// USR new firmware manual Example #7: switch to VLS=5 ("Speaker connected to DCE,
+//   DCE off-hook — call screening") before AT+VRX to route PSTN audio into the
+//   modem receive path.  Without this, VRX in VLS=1 mode does not capture line audio.
+// Other modems: null = no VLS change needed before VRX.
+const VLS_RECORD_CMD: Record<ModemModel, string | null> = {
+  USR:      'AT+VLS=5',
+  CONEXANT: null,
+  MT9234MU: null,
+  UNKNOWN:  null,
 };
 
 // DTE→DCE: end voice transmit  (<DLE><ETX> or triple-DLE for Conexant)
@@ -68,12 +108,26 @@ const RECORD_GAIN: Record<ModemModel, string | null> = {
 };
 
 // AT+VGT: transmit (playback) volume applied before AT+VTX.
-//   All three modems support the same 0-255 range with 128=nominal.
+//   All modems: 128=nominal (default), 0-255 range.
+//   USR new firmware manual Example #7 uses VGT=128 (nominal).
 const PLAYBACK_VOLUME: Record<ModemModel, string> = {
-  USR:      'AT+VGT=200',
+  USR:      'AT+VGT=128',  // nominal per new firmware manual Example #7
   CONEXANT: 'AT+VGT=200',
   MT9234MU: 'AT+VGT=200',
   UNKNOWN:  'AT+VGT=200',
+};
+
+// AT+VTS beep played after greeting, before recording.
+//   Format: [freq1,freq2,duration×10ms]
+//   USR new firmware manual Example #7 shows [933,0,120] but freq2=0 is below the
+//   300–3300 Hz valid range and returns ERROR on some firmware. Using [933,933,120]
+//   (single frequency, both params same) avoids the rejection.
+//   Other modems: dual 900 Hz tone, 1.2 seconds.
+const VOICE_TONE_BEEP: Record<ModemModel, string> = {
+  USR:      'AT+VTS=[933,933,120]',
+  CONEXANT: 'AT+VTS=[900,900,120]',
+  MT9234MU: 'AT+VTS=[900,900,120]',
+  UNKNOWN:  'AT+VTS=[900,900,120]',
 };
 
 // Audio chunk sleep interval (ms) while streaming audio to modem
@@ -102,10 +156,20 @@ const DCE_QUIET_DETECTED     = Buffer.from([0x10, 0x71]); // Event 10: Presumed 
 
 // Per-model hang-up sequences — only codes documented for that modem.
 // Using another modem's codes risks false positives from valid voice data bytes.
+//
+// USR 5637 notes (per manual Table 189):
+//   <DLE>H (DCE_PHONE_OFF_HOOK) means "Local phone off-hook" — a parallel
+//   handset was picked up, OR the modem emits it as a self-confirmation after
+//   AT+VLS=1.  Including it as a hang-up trigger causes a false CALL_END
+//   immediately after answering, so it is intentionally excluded here.
+//   <DLE>s (DCE_SILENCE_DETECTED) is only injected when AT+VSD=128,50 is
+//   active (recording phase); it is safe to include in the list at all times
+//   because the modem won't send it during greeting playback (VSD=128,0).
+//
 // MT9234MU includes <DLE>s and <DLE>q which are injected when AT+VSD hardware
 // silence detection fires (see SILENCE_DETECTION_CMD above).
 const HANGUP_SEQS: Record<ModemModel, Buffer[]> = {
-  USR:      [DCE_END_VOICE_DATA, DCE_PHONE_OFF_HOOK, DCE_LINE_CURRENT_BREAK, DCE_BUSY_TONE, DCE_DIAL_TONE],
+  USR:      [DCE_END_VOICE_DATA, DCE_LINE_CURRENT_BREAK, DCE_BUSY_TONE, DCE_DIAL_TONE, DCE_SILENCE_DETECTED],
   CONEXANT: [DCE_END_VOICE_DATA, DCE_PHONE_OFF_HOOK, DCE_LINE_CURRENT_BREAK, DCE_LOOP_CURRENT_INT, DCE_BUSY_TONE, DCE_DIAL_TONE],
   MT9234MU: [DCE_END_VOICE_DATA, DCE_PHONE_OFF_HOOK, DCE_BUSY_TONE, DCE_DIAL_TONE, DCE_SILENCE_DETECTED, DCE_QUIET_DETECTED],
   UNKNOWN:  [DCE_END_VOICE_DATA, DCE_PHONE_OFF_HOOK, DCE_LINE_CURRENT_BREAK, DCE_BUSY_TONE, DCE_DIAL_TONE],
@@ -120,6 +184,10 @@ export class Modem {
   private parser = new CallerIdParser();
   private listeners: ((event: ModemEvent) => void)[] = [];
   model: ModemModel = 'UNKNOWN';
+
+  // Optional logger wired up by index.ts to route AT command responses to the
+  // debug console (via modemLog). If null, responses only go to console.log.
+  onLog: ((msg: string) => void) | null = null;
 
   private inVoiceMode = false;
   private isOffHook = false;   // true between answer() and hangUp()
@@ -139,6 +207,11 @@ export class Modem {
 
   private emit(event: ModemEvent): void {
     for (const l of this.listeners) l(event);
+  }
+
+  private log(msg: string): void {
+    console.log(msg);
+    this.onLog?.(msg);
   }
 
   // ─── Serial port ──────────────────────────────────────────────────────────
@@ -262,13 +335,20 @@ export class Modem {
       }
 
       let response = '';
-      const timeout = setTimeout(() => resolve(response), delayMs + 500);
+      const timeout = setTimeout(() => {
+        this.port!.removeListener('data', onData);
+        const trimmed = response.replace(/[\r\n]+/g, ' ').trim();
+        this.log(`[AT] ${cmd} → TIMEOUT (got: "${trimmed}")`);
+        resolve(response);
+      }, delayMs + 500);
 
       const onData = (chunk: Buffer) => {
         response += chunk.toString('ascii');
         if (response.includes('OK') || response.includes('ERROR') || response.includes('CONNECT') || response.includes('VCON')) {
           clearTimeout(timeout);
           this.port!.removeListener('data', onData);
+          const trimmed = response.replace(/[\r\n]+/g, ' ').trim();
+          this.log(`[AT] ${cmd} → ${trimmed}`);
           resolve(response);
         }
       };
@@ -287,6 +367,33 @@ export class Modem {
   private async writeRaw(data: Buffer): Promise<void> {
     await new Promise<void>((resolve, reject) => {
       this.port!.write(data, (err) => err ? reject(err) : resolve());
+    });
+  }
+
+  // Send raw bytes and wait for the modem's OK/ERROR response.
+  // Used to end voice TX/RX sessions (DLE+ETX / DLE+!) — the modem responds
+  // with OK after processing these, and consuming it here prevents the stale OK
+  // from polluting subsequent sendCommand listeners.
+  private async writeRawAndWait(data: Buffer, delayMs = 500): Promise<void> {
+    return new Promise((resolve) => {
+      if (!this.port?.isOpen) { resolve(); return; }
+      let response = '';
+      const timeout = setTimeout(() => {
+        this.port!.removeListener('data', onData);
+        resolve();
+      }, delayMs + 500);
+      const onData = (chunk: Buffer) => {
+        response += chunk.toString('ascii');
+        if (response.includes('OK') || response.includes('ERROR')) {
+          clearTimeout(timeout);
+          this.port!.removeListener('data', onData);
+          resolve();
+        }
+      };
+      this.port!.on('data', onData);
+      this.port!.write(data, (err) => {
+        if (err) { clearTimeout(timeout); this.port!.removeListener('data', onData); resolve(); }
+      });
     });
   }
 
@@ -330,16 +437,21 @@ export class Modem {
   // ─── Call control ─────────────────────────────────────────────────────────
 
   /**
-   * Answer the call: configure all voice parameters then go off-hook (TAD mode).
-   * Per USR 5637 manual Example #7: FCLASS=8 → VGT → VSM → VSD → VLS=1
-   * All parameters must be set BEFORE VLS=1 to ensure proper voice mode setup.
+   * Answer the call: configure voice mode and go off-hook (TAD mode).
+   *
+   * USR new firmware manual Example #7:
+   *   FCLASS=8 → VGT=128 → VSM=128,8000 → VSD=128,0 → VLS=1
+   * Setup is sent once here; play/record calls skip it (RESEND_SETUP_PER_OP=false).
    */
   async answer(): Promise<void> {
     await this.sendCommand('AT+FCLASS=8', 500);
-    await this.sendCommand(PLAYBACK_VOLUME[this.model], 500);
-    await this.sendCommand(VOICE_COMPRESSION[this.model], 500);
+    if (!RESEND_SETUP_PER_OP[this.model]) {
+      // For modems that send setup only once, include VGT/VSM here
+      await this.sendCommand(PLAYBACK_VOLUME[this.model], 500);
+      await this.sendCommand(VOICE_COMPRESSION[this.model], 500);
+    }
     await this.sendCommand(SILENCE_DETECTION_CMD[this.model], 500);
-    await this.sendCommand('AT+VLS=1', 1000); // TAD off-hook (answers the call)
+    await this.sendCommand('AT+VLS=1', 1000);
     this.isOffHook = true;
   }
 
@@ -376,8 +488,9 @@ export class Modem {
   async playAudio(audioData: Buffer): Promise<void> {
     if (!this.port?.isOpen) return;
 
-    if (!this.isOffHook) {
-      // Standalone use (not preceded by answer()): configure everything first
+    if (!this.isOffHook || RESEND_SETUP_PER_OP[this.model]) {
+      // Re-send full setup: always for USR (matches Python play_audio),
+      // or first time only for other modems.
       await this.sendCommand('AT+FCLASS=8', 500);
       await this.sendCommand(PLAYBACK_VOLUME[this.model], 500);
       await this.sendCommand(VOICE_COMPRESSION[this.model], 500);
@@ -394,8 +507,7 @@ export class Modem {
       await sleep(sleepMs);
     }
 
-    await this.writeRaw(END_VOICE_TX[this.model]);
-    await sleep(500); // give modem time to flush
+    await this.writeRawAndWait(END_VOICE_TX[this.model], 500);
   }
 
   /**
@@ -405,8 +517,9 @@ export class Modem {
   async playAudioStream(source: AsyncIterable<Buffer>): Promise<void> {
     if (!this.port?.isOpen) return;
 
-    if (!this.isOffHook) {
-      // Standalone use (not preceded by answer()): configure everything first
+    if (!this.isOffHook || RESEND_SETUP_PER_OP[this.model]) {
+      // Re-send full setup: always for USR (matches Python play_audio),
+      // or first time only for other modems.
       await this.sendCommand('AT+FCLASS=8', 500);
       await this.sendCommand(PLAYBACK_VOLUME[this.model], 500);
       await this.sendCommand(VOICE_COMPRESSION[this.model], 500);
@@ -419,29 +532,42 @@ export class Modem {
       await this.writeRaw(chunk);
     }
 
-    await this.writeRaw(END_VOICE_TX[this.model]);
-    await sleep(500);
+    await this.writeRawAndWait(END_VOICE_TX[this.model], 500);
   }
 
   /**
    * Start recording voicemail.
-   * Per USR manual Example #7: after answer()+playAudioStream(), modem is still off-hook.
-   * Only VSD and VGR need to be (re)applied before VRX; VSM and VGT were set in answer().
+   * Per USR 5637 manual Example #7, the sequence after greeting ends is:
+   *   VTS (beep) → VSD=128,50 (enable silence detection) → VLS=5 (call screening
+   *   mode — routes PSTN audio into modem receive path) → VGR → VRX
+   * Other modems: same order but no VLS change (null VLS_RECORD_CMD).
    * If called standalone (no prior answer()), configure everything from scratch.
    */
   async startRecording(): Promise<void> {
     this.voiceBuffer = [];
 
-    if (!this.isOffHook) {
+    if (!this.isOffHook || RESEND_SETUP_PER_OP[this.model]) {
+      // Re-send full setup: always for USR (matches Python record_audio),
+      // or first time only for other modems.
       await this.sendCommand('AT+FCLASS=8', 500);
       await this.sendCommand(PLAYBACK_VOLUME[this.model], 500);
       await this.sendCommand(VOICE_COMPRESSION[this.model], 500);
+      await this.sendCommand(SILENCE_DETECTION_CMD[this.model], 500);
       await this.sendCommand('AT+VLS=1', 1000);
     }
-    await this.sendCommand(SILENCE_DETECTION_CMD[this.model], 500);
+
+    // Beep first (per manual: VTS before VSD/VLS changes)
+    await this.sendCommand(VOICE_TONE_BEEP[this.model], 2000);
+
+    // Switch silence detection to recording mode (USR: enable 5s hardware detection)
+    await this.sendCommand(SILENCE_DETECTION_RECORD_CMD[this.model], 500);
+
+    // Switch VLS to recording mode if required (USR: VLS=1→VLS=5)
+    const vlsRecord = VLS_RECORD_CMD[this.model];
+    if (vlsRecord) await this.sendCommand(vlsRecord, 500);
+
     const recordGain = RECORD_GAIN[this.model];
     if (recordGain) await this.sendCommand(recordGain, 500);
-    await this.sendCommand('AT+VTS=[900,900,120]', 2000); // 1.2 second beep
 
     this.inVoiceMode = true; // set before VRX so incoming voice data is captured
     await this.sendCommand('AT+VRX', 2000); // modem responds with CONNECT
