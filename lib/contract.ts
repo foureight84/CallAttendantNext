@@ -45,6 +45,7 @@ export const AppSettingsSchema = z.object({
   autoBlockSpam:          z.boolean(),
   enableGpio:             z.boolean(),
   debugConsole:           z.boolean(),
+  diagnosticMode:         z.boolean(),
   savePcmDebug:           z.boolean(),
   greetingVoice:          z.string(),
   greetingLengthScale:    z.number(),

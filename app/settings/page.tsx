@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Stack, Title, Card, Group, Text, Button, Slider, NumberInput, Switch, Select, MultiSelect, Divider, Radio, TextInput, Box } from '@mantine/core';
+import { Stack, Title, Card, Group, Text, Button, Slider, NumberInput, Switch, Select, MultiSelect, Divider, Radio, TextInput, Box, Anchor } from '@mantine/core';
+import Link from 'next/link';
 import { notifications } from '@mantine/notifications';
 import { useForm } from '@mantine/form';
 import { apiClient } from '@/lib/api-client';
@@ -26,6 +27,7 @@ export default function SettingsPage() {
       ringsBeforeVmBlocklist: 0,
       enableGpio: false,
       debugConsole: false,
+      diagnosticMode: false,
       savePcmDebug: false,
       greetingVoice: '',
       greetingLengthScale: 1.0,
@@ -246,6 +248,17 @@ export default function SettingsPage() {
                 label="Enable Debug Console"
                 description="Shows the Debug Console menu item and allows access to /debug."
                 {...form.getInputProps('debugConsole', { type: 'checkbox' })}
+              />
+              <Switch
+                label="Enable Diagnostic Mode"
+                description={
+                  <>
+                    Shows the Diagnostics menu item and allows access to{' '}
+                    <Anchor component={Link} href="/diagnostic" size="sm">/diagnostic</Anchor>
+                    {' '}— an interactive wizard for testing modem call handling end-to-end.
+                  </>
+                }
+                {...form.getInputProps('diagnosticMode', { type: 'checkbox' })}
               />
               <Switch
                 label="Save PCM debug files"

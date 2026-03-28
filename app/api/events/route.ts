@@ -29,12 +29,14 @@ export async function GET() {
       const voicemailPlayedHandler = ()              => enqueue({ type: 'voicemail-played' });
       const voicemailNewHandler    = ()              => enqueue({ type: 'voicemail-new' });
       const logHandler             = (data: unknown) => enqueue({ type: 'modem-log', payload: data });
+      const diagnosticHandler      = (data: unknown) => enqueue({ type: 'diagnostic-update', payload: data });
 
       callEvents.on('incoming-call',    incomingCallHandler);
       callEvents.on('new-voicemail',    voicemailHandler);
       callEvents.on('voicemail-played', voicemailPlayedHandler);
       callEvents.on('voicemail-new',    voicemailNewHandler);
       callEvents.on('modem-log',        logHandler);
+      callEvents.on('diagnostic-update', diagnosticHandler);
 
       const heartbeat = setInterval(() => {
         try { controller.enqueue(encoder.encode(': heartbeat\n\n')); }
@@ -48,6 +50,7 @@ export async function GET() {
         callEvents.removeListener('voicemail-played', voicemailPlayedHandler);
         callEvents.removeListener('voicemail-new',    voicemailNewHandler);
         callEvents.removeListener('modem-log',        logHandler);
+        callEvents.removeListener('diagnostic-update', diagnosticHandler);
       };
     },
     cancel() {

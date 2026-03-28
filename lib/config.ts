@@ -14,6 +14,7 @@ export const config = {
   autoBlockSpam: process.env.AUTO_BLOCK_SPAM !== 'false',
   enableGpio: process.env.ENABLE_GPIO === 'true',
   debugConsole: process.env.DEBUG_CONSOLE === 'true',
+  diagnosticMode: process.env.DIAGNOSTIC_MODE === 'true',
   savePcmDebug: process.env.SAVE_PCM_DEBUG === 'true',
   port: parseInt(process.env.PORT ?? '3000', 10),
   piperBinary:      process.env.PIPER_BINARY       ?? 'piper',
