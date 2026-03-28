@@ -365,6 +365,16 @@ export interface AppSettings {
   logFile: string;
   logMaxBytes: number;
   logKeepFiles: number;
+  emailEnabled: boolean;
+  emailHost: string;
+  emailPort: number;
+  emailUser: string;
+  emailPass: string;
+  emailFrom: string;
+  emailTo: string;
+  emailNotifyVoicemail: boolean;
+  emailNotifyBlocked: boolean;
+  emailNotifyAll: boolean;
 }
 
 export async function getSettings(): Promise<AppSettings> {
@@ -388,6 +398,16 @@ export async function getSettings(): Promise<AppSettings> {
     logFile:      map['logFile']      ?? config.logFile,
     logMaxBytes:  parseInt(map['logMaxBytes']  ?? String(config.logMaxBytes),  10),
     logKeepFiles: parseInt(map['logKeepFiles'] ?? String(config.logKeepFiles), 10),
+    emailEnabled:         (map['emailEnabled']         ?? String(config.emailEnabled))         === 'true',
+    emailHost:             map['emailHost']             ?? config.emailHost,
+    emailPort:             parseInt(map['emailPort']   ?? String(config.emailPort), 10),
+    emailUser:             map['emailUser']             ?? config.emailUser,
+    emailPass:             map['emailPass']             ?? config.emailPass,
+    emailFrom:             map['emailFrom']             ?? config.emailFrom,
+    emailTo:               map['emailTo']               ?? config.emailTo,
+    emailNotifyVoicemail: (map['emailNotifyVoicemail'] ?? String(config.emailNotifyVoicemail)) === 'true',
+    emailNotifyBlocked:   (map['emailNotifyBlocked']   ?? String(config.emailNotifyBlocked))   === 'true',
+    emailNotifyAll:       (map['emailNotifyAll']       ?? String(config.emailNotifyAll))       === 'true',
   };
 }
 

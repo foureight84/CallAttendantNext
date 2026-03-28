@@ -52,6 +52,16 @@ export const AppSettingsSchema = z.object({
   logFile:                z.string(),
   logMaxBytes:            z.number(),
   logKeepFiles:           z.number(),
+  emailEnabled:           z.boolean(),
+  emailHost:              z.string(),
+  emailPort:              z.number(),
+  emailUser:              z.string(),
+  emailPass:              z.string(),
+  emailFrom:              z.string(),
+  emailTo:                z.string(),
+  emailNotifyVoicemail:   z.boolean(),
+  emailNotifyBlocked:     z.boolean(),
+  emailNotifyAll:         z.boolean(),
 });
 
 const OkSchema = z.object({ ok: z.literal(true) });
