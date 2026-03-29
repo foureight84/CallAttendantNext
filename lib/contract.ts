@@ -62,6 +62,14 @@ export const AppSettingsSchema = z.object({
   emailNotifyVoicemail:   z.boolean(),
   emailNotifyBlocked:     z.boolean(),
   emailNotifyAll:         z.boolean(),
+  mqttEnabled:            z.boolean(),
+  mqttBrokerUrl:          z.string(),
+  mqttUsername:           z.string(),
+  mqttPassword:           z.string(),
+  mqttTopicPrefix:        z.string(),
+  mqttNotifyVoicemail:    z.boolean(),
+  mqttNotifyBlocked:      z.boolean(),
+  mqttNotifyAll:          z.boolean(),
 });
 
 const OkSchema = z.object({ ok: z.literal(true) });

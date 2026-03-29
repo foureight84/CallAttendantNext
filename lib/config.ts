@@ -33,4 +33,12 @@ export const config = {
   emailNotifyVoicemail: process.env.EMAIL_NOTIFY_VOICEMAIL !== 'false',
   emailNotifyBlocked:   process.env.EMAIL_NOTIFY_BLOCKED   === 'true',
   emailNotifyAll:       process.env.EMAIL_NOTIFY_ALL        === 'true',
+  mqttEnabled:          process.env.MQTT_ENABLED            === 'true',
+  mqttBrokerUrl:        process.env.MQTT_BROKER_URL         ?? '',
+  mqttUsername:         process.env.MQTT_USERNAME           ?? '',
+  mqttPassword:         process.env.MQTT_PASSWORD           ?? '',
+  mqttTopicPrefix:      process.env.MQTT_TOPIC_PREFIX       ?? 'callattendant',
+  mqttNotifyVoicemail:  process.env.MQTT_NOTIFY_VOICEMAIL   !== 'false',
+  mqttNotifyBlocked:    process.env.MQTT_NOTIFY_BLOCKED     !== 'false',
+  mqttNotifyAll:        process.env.MQTT_NOTIFY_ALL         === 'true',
 } as const;

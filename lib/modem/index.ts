@@ -5,6 +5,7 @@ import { synthesize } from './tts';
 import { insertCallLog, insertMessage, getSettings, isWhitelisted, isBlacklisted } from '../db';
 import { callEvents, modemLog } from '../events';
 import { sendCallEmail } from '../email';
+import { publishCallMqtt } from '../mqtt';
 import { config } from '../config';
 import path from 'path';
 import { blinkLed, GPIO_PINS } from './gpio';
@@ -266,6 +267,7 @@ async function handleRing(): Promise<void> {
   }
   callEvents.emit('call-resolved', { action: screening.action, number });
   sendCallEmail(emailSnapshot).catch(() => {});
+  publishCallMqtt(emailSnapshot).catch(() => {});
   pendingEmailData = null;
 }
 
