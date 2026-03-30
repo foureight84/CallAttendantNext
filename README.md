@@ -70,6 +70,8 @@ All other keys are optional and fall back to sensible defaults.
 
 ---
 
+#Getting Started#
+
 ## Environment Variables
 
 All variables are optional except `SERIAL_PORT` and `SERIAL_BAUD_RATE`.
