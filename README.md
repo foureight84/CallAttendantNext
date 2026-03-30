@@ -39,6 +39,13 @@ If you have a hardware modem not on this list and would like support added, open
 
 ---
 
+## Roadmap
+- **SEON API integration** - provide additional Caller ID discovery as well as number reputation to weave out fraudulent and malicious callers that may not be on NOMOROBO's database.
+- **Voicemail Transcription** - can't guarantee but something to explore if it is feasible to deploy a Speech-to-text feature. Whisper-cpp is a likely candidate.
+- **User Request** - While I am the only one using this app daily, if we get more adoptions and you feel that there a must-have feature, then feel free to open a [Feature-Request] ticket in the Issues section.
+
+---
+
 ## Configuration (`.env`)
 
 Copy `.env.example` to `.env` and set your values:
