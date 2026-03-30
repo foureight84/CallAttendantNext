@@ -32,8 +32,6 @@ let screeningPromise: Promise<{ action: 'Blocked' | 'Permitted' | 'Screened'; re
 let ringTimeoutId: ReturnType<typeof setTimeout> | null = null;
 let preSynthesizedGreeting: Buffer[] | null = null;
 let preSynthesizedPleaseLeave: Buffer[] | null = null;
-// Tracks the current call's details for email notification sent on call-resolved.
-let pendingEmailData: { action: 'Permitted' | 'Blocked' | 'Screened'; name: string; number: string; date: string; time: string; systemDateTime: string; reason: string; voicemailFilename?: string } | null = null;
 
 function scheduleRingTimeout(): void {
   if (ringTimeoutId !== null) clearTimeout(ringTimeoutId);
@@ -251,29 +249,27 @@ async function handleRing(): Promise<void> {
   const resolvedName = await resolveCallerName(name, number);
   callEvents.emit('incoming-call', { callLogId, name: resolvedName, number, date, time, action: screening.action, reason: screening.reason });
 
-  // Keep a local reference — resetCallState() inside goToVoicemail sets
-  // pendingEmailData = null, so the module-level variable is gone by the time
-  // we return here. The local snapshot still points to the same object, and
-  // the voicemail filename is mutated onto it during goToVoicemail.
-  pendingEmailData = { action: screening.action, name: resolvedName, number, date, time, systemDateTime, reason: screening.reason };
-  const emailSnapshot = pendingEmailData;
+  const emailSnapshot: { action: 'Permitted' | 'Blocked' | 'Screened'; name: string; number: string; date: string; time: string; systemDateTime: string; reason: string; voicemailFilename?: string } = {
+    action: screening.action, name: resolvedName, number, date, time, systemDateTime, reason: screening.reason,
+  };
 
+  let voicemailFilename: string | null = null;
   if (screening.action === 'Blocked') {
-    await handleBlockedCall(callLogId, ringCount, name, number);
+    voicemailFilename = await handleBlockedCall(callLogId, ringCount, name, number);
   } else if (screening.action === 'Permitted') {
-    await handlePermittedCall(callLogId, name, number);
+    voicemailFilename = await handlePermittedCall(callLogId, name, number);
   } else {
-    await handleScreenedCall(callLogId, ringCount, name, number, screening.immediate);
+    voicemailFilename = await handleScreenedCall(callLogId, ringCount, name, number, screening.immediate);
   }
+  if (voicemailFilename) emailSnapshot.voicemailFilename = voicemailFilename;
   callEvents.emit('call-resolved', { action: screening.action, number });
   sendCallEmail(emailSnapshot).catch(() => {});
   publishCallMqtt(emailSnapshot).catch(() => {});
-  pendingEmailData = null;
 }
 
-async function handleBlockedCall(callLogId: number, currentRing: number, name: string, number: string): Promise<void> {
+async function handleBlockedCall(callLogId: number, currentRing: number, name: string, number: string): Promise<string | null> {
   const modem = globalThis.__modemInstance;
-  if (!modem) return;
+  if (!modem) return null;
   const settings = await getSettings();
 
   // Action 3: send to voicemail after N rings
@@ -281,10 +277,10 @@ async function handleBlockedCall(callLogId: number, currentRing: number, name: s
     const ringsLeft = Math.max(0, settings.ringsBeforeVmBlocklist - currentRing);
     modemLog('info', `Blocked caller — sending to voicemail after ${ringsLeft} more ring(s)`);
     await waitForRings(ringsLeft);
-    if (!isHandlingCall) { modemLog('info', 'Blocked call aborted — caller hung up'); return; }
-    await goToVoicemail(callLogId, 'general_greeting', settings.greetingVoice, settings.greetingLengthScale, name, number, settings.savePcmDebug);
+    if (!isHandlingCall) { modemLog('info', 'Blocked call aborted — caller hung up'); return null; }
+    const filename = await goToVoicemail(callLogId, 'general_greeting', settings.greetingVoice, settings.greetingLengthScale, name, number, settings.savePcmDebug);
     await blinkLed(GPIO_PINS.BLOCKED, 1);
-    return;
+    return filename;
   }
 
   // Action 1: hang up silently
@@ -308,36 +304,38 @@ async function handleBlockedCall(callLogId: number, currentRing: number, name: s
   modemLog('info', 'Hung up blocked call');
   await blinkLed(GPIO_PINS.BLOCKED, 1);
   resetCallState();
+  return null;
 }
 
-async function handlePermittedCall(callLogId: number, name: string, number: string): Promise<void> {
-  if (!globalThis.__modemInstance) return;
+async function handlePermittedCall(callLogId: number, name: string, number: string): Promise<string | null> {
+  if (!globalThis.__modemInstance) return null;
   const settings = await getSettings();
   const ringsLeft = settings.ringsBeforeVm - ringCount;
   modemLog('info', `Permitted caller — waiting ${ringsLeft} more ring(s) before voicemail`);
   await waitForRings(ringsLeft);
-  if (!isHandlingCall) { modemLog('info', 'Permitted call aborted — caller hung up'); return; }
-  await goToVoicemail(callLogId, 'general_greeting', settings.greetingVoice, settings.greetingLengthScale, name, number, settings.savePcmDebug);
+  if (!isHandlingCall) { modemLog('info', 'Permitted call aborted — caller hung up'); return null; }
+  const filename = await goToVoicemail(callLogId, 'general_greeting', settings.greetingVoice, settings.greetingLengthScale, name, number, settings.savePcmDebug);
   await blinkLed(GPIO_PINS.ALLOWED, 1);
+  return filename;
 }
 
-async function handleScreenedCall(callLogId: number, currentRing: number, name: string, number: string, immediate = false): Promise<void> {
-  if (!globalThis.__modemInstance) return;
+async function handleScreenedCall(callLogId: number, currentRing: number, name: string, number: string, immediate = false): Promise<string | null> {
+  if (!globalThis.__modemInstance) return null;
   const settings = await getSettings();
   const ringsLeft = immediate ? 0 : Math.max(0, settings.ringsBeforeVmScreened - currentRing);
   modemLog('info', `Screened caller — answering after ${ringsLeft} more ring(s)`);
   await waitForRings(ringsLeft);
-  if (!isHandlingCall) { modemLog('info', 'Screened call aborted — caller hung up'); return; }
-  await goToVoicemail(callLogId, 'general_greeting', settings.greetingVoice, settings.greetingLengthScale, name, number, settings.savePcmDebug);
+  if (!isHandlingCall) { modemLog('info', 'Screened call aborted — caller hung up'); return null; }
+  return goToVoicemail(callLogId, 'general_greeting', settings.greetingVoice, settings.greetingLengthScale, name, number, settings.savePcmDebug);
 }
 
 function resolveModelPath(modelFilename: string): string {
   return path.join(path.resolve(config.piperModelsDir), modelFilename);
 }
 
-async function goToVoicemail(callLogId: number, greetingBasename: string, voice: string, lengthScale: number, name: string, number: string, savePcmDebug = false): Promise<void> {
+async function goToVoicemail(callLogId: number, greetingBasename: string, voice: string, lengthScale: number, name: string, number: string, savePcmDebug = false): Promise<string | null> {
   const modem = globalThis.__modemInstance;
-  if (!modem) return;
+  if (!modem) return null;
 
   modemLog('info', 'Answering call — entering voice mode (AT+FCLASS=8 → AT+VLS=1)...');
   try {
@@ -346,7 +344,7 @@ async function goToVoicemail(callLogId: number, greetingBasename: string, voice:
   } catch (err) {
     modemLog('error', `Failed to answer call: ${err}`);
     resetCallState();
-    return;
+    return null;
   }
   await sleep(1000);
 
@@ -375,7 +373,7 @@ async function goToVoicemail(callLogId: number, greetingBasename: string, voice:
     modemLog('info', 'Caller hung up during greeting — skipping recording');
     await modem.hangUp().catch(() => {});
     resetCallState();
-    return;
+    return null;
   }
 
   modemLog('info', 'Starting recording — playing beep then AT+VRX...');
@@ -418,6 +416,7 @@ async function goToVoicemail(callLogId: number, greetingBasename: string, voice:
   modemLog('info', `Recording ended — ${pcmData.length} bytes captured`);
 
   // 8000 bytes = 1 second at 8kHz 8-bit mono — filters hang-up transients
+  let savedFilename: string | null = null;
   if (pcmData.length > 8000) {
     try {
       const filename = await savePcmAsMP3(pcmData, callLogId, number, name, savePcmDebug);
@@ -425,7 +424,7 @@ async function goToVoicemail(callLogId: number, greetingBasename: string, voice:
         await insertMessage({ CallLogID: callLogId, Played: 0, Filename: filename, DateTime: new Date().toISOString() });
         modemLog('info', `Voicemail saved: ${filename}`);
         callEvents.emit('new-voicemail', { callLogId, filename });
-        if (pendingEmailData) pendingEmailData.voicemailFilename = filename;
+        savedFilename = filename;
       } else {
         modemLog('info', 'Recording discarded — insufficient audio content after trimming');
       }
@@ -439,6 +438,7 @@ async function goToVoicemail(callLogId: number, greetingBasename: string, voice:
   await modem.hangUp();
   modemLog('info', 'Call ended — on hook');
   resetCallState();
+  return savedFilename;
 }
 
 async function handleCallEnd(): Promise<void> {
@@ -474,7 +474,6 @@ function resetCallState(): void {
   screeningPromise = null;
   preSynthesizedGreeting = null;
   preSynthesizedPleaseLeave = null;
-  pendingEmailData = null;
   if (ringTimeoutId !== null) {
     clearTimeout(ringTimeoutId);
     ringTimeoutId = null;
