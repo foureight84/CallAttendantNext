@@ -33,6 +33,9 @@ If you have a hardware modem not on this list and would like support added, open
 - **Updated Nomorobo scraping** — adapted for their current website format
 - **Improved serial port handling** — faster modem detection, reduced call response time
 - **Raspberry Pi GPIO LED support** — toggle via `ENABLE_GPIO=true` in `.env`
+- **SMTP email notifications** — send call event emails via any SMTP provider (Gmail, Outlook, iCloud, or custom); configurable per-event triggers (voicemail received, blocked call, all calls); optional MP3 voicemail attachment
+- **MQTT notifications** — publish call events as JSON to any MQTT broker after each call; integrates with Home Assistant via the [CallAttendantNext Monitor HACS integration](https://github.com/foureight84/CallAttendantNext_Monitor)
+- **Migration script** — import existing call log, whitelist, blocklist, and voicemail recordings from a Python callattendant database
 
 ---
 
@@ -57,6 +60,93 @@ cp .env.example .env
 | `SERIAL_BAUD_RATE` | Modem baud rate — `115200` for all supported modems |
 
 All other keys are optional and fall back to sensible defaults.
+
+---
+
+## Environment Variables
+
+All variables are optional except `SERIAL_PORT` and `SERIAL_BAUD_RATE`.
+
+### Core
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SERIAL_PORT` | `/dev/ttyUSB0` | **Required.** Path to modem device (e.g. `/dev/ttyUSB0`, `/dev/tty.usbmodem*`, `COM3`) |
+| `SERIAL_BAUD_RATE` | `57600` | **Required.** Modem baud rate — `115200` recommended for all supported modems |
+| `PORT` | `3000` | HTTP port the web UI listens on |
+| `DB_PATH` | `./callattendant.db` | Path to the SQLite database file — do not change when using Docker |
+| `MESSAGES_DIR` | `./messages` | Directory where voicemail MP3 files are saved — do not change when using Docker |
+
+### Call Screening
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SCREENING_MODE` | `whitelist,blacklist` | Comma-separated list of active screening modes. Values: `whitelist`, `blacklist` |
+| `BLOCK_SERVICE` | `NOMOROBO` | External spam lookup service. Currently only `NOMOROBO` is supported |
+| `SPAM_THRESHOLD` | `2` | Nomorobo score at which a caller is considered spam and blocked. `1` = suspicious, `2` = confirmed spam |
+| `AUTO_BLOCK_SPAM` | `true` | Automatically add callers to the blocklist when their spam score meets the threshold |
+| `RINGS_BEFORE_VM` | `4` | Rings before answering for whitelisted callers |
+| `RINGS_BEFORE_VM_SCREENED` | `2` | Rings before answering for screened (unknown) callers |
+| `BLOCKLIST_ACTION` | `2` | What to do with blacklisted callers: `1` = hang up silently, `2` = play blocked greeting then hang up, `3` = send to voicemail after N rings |
+| `RINGS_BEFORE_VM_BLOCKLIST` | `0` | Rings before voicemail for blacklisted callers when `BLOCKLIST_ACTION=3` |
+
+### Piper TTS
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PIPER_BINARY` | `piper` | Path to the Piper binary. Set when running baremetal; Docker installs it automatically |
+| `PIPER_MODELS_DIR` | `./piper-models` | Directory containing `.onnx` voice model files (scanned automatically) |
+| `PIPER_LENGTH_SCALE` | `1.0` | Speech speed multiplier. `1.0` = normal speed; higher values slow speech down. Range: `1.0`–`1.5` |
+
+### Logging
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LOG_FILE` | `./logs/modem.log` | Path to the rotating modem log file |
+| `LOG_MAX_BYTES` | `5242880` | Log file size limit in bytes before rotation (default: 5 MB) |
+| `LOG_KEEP_FILES` | `2` | Number of rotated log files to retain |
+
+### GPIO
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ENABLE_GPIO` | `false` | Enable Raspberry Pi GPIO LED indicators. Set to `true` on supported Pi hardware |
+
+### Debugging
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DEBUG_CONSOLE` | `false` | Enable the Debug Console page in the UI |
+| `DIAGNOSTIC_MODE` | `false` | Enable the Diagnostics page for running modem self-tests |
+| `SAVE_PCM_DEBUG` | `false` | Save raw PCM audio to disk during voicemail recording for debugging |
+
+### SMTP Email Notifications
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `EMAIL_ENABLED` | `false` | Enable SMTP email notifications |
+| `EMAIL_HOST` | _(empty)_ | SMTP server hostname (e.g. `smtp.gmail.com`) |
+| `EMAIL_PORT` | `587` | SMTP port — `587` for STARTTLS, `465` for SSL |
+| `EMAIL_USER` | _(empty)_ | SMTP username / email address |
+| `EMAIL_PASS` | _(empty)_ | SMTP password or app-specific password |
+| `EMAIL_FROM` | _(empty)_ | Sender address — defaults to `EMAIL_USER` if blank |
+| `EMAIL_TO` | _(empty)_ | Recipient address for notifications |
+| `EMAIL_NOTIFY_VOICEMAIL` | `true` | Send email when a voicemail is recorded (with MP3 attached) |
+| `EMAIL_NOTIFY_BLOCKED` | `false` | Send email when a call is blocked |
+| `EMAIL_NOTIFY_ALL` | `false` | Send email for every call regardless of action |
+
+### MQTT Notifications
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MQTT_ENABLED` | `false` | Enable MQTT call event publishing |
+| `MQTT_BROKER_URL` | _(empty)_ | MQTT broker URL (e.g. `mqtt://homeassistant.local:1883`) |
+| `MQTT_USERNAME` | _(empty)_ | MQTT broker username |
+| `MQTT_PASSWORD` | _(empty)_ | MQTT broker password |
+| `MQTT_TOPIC_PREFIX` | `callattendant` | Topic prefix — events published to `{prefix}/call` |
+| `MQTT_NOTIFY_VOICEMAIL` | `true` | Publish MQTT message when a voicemail is recorded |
+| `MQTT_NOTIFY_BLOCKED` | `true` | Publish MQTT message when a call is blocked |
+| `MQTT_NOTIFY_ALL` | `false` | Publish MQTT message for every call regardless of action |
 
 ---
 
@@ -395,6 +485,81 @@ Greeting text files live in `public/audio/script/`. Edit them to customize what 
 | `goodbye.txt` | Played when ending an interaction |
 | `invalid_response.txt` | Played when an unrecognized input is received |
 | `voice_mail_menu.txt` | Played to present the voicemail menu options |
+
+---
+
+## SMTP Email Notifications
+
+Configure email alerts in **Settings → Email Notifications**. Supported providers include Gmail, Outlook, iCloud, and any custom SMTP server.
+
+| Setting | Description |
+|---------|-------------|
+| SMTP Host | e.g. `smtp.gmail.com` |
+| Port | `587` (STARTTLS) or `465` (SSL) |
+| Username | Your email address |
+| Password | Your password or app-specific password |
+| From | Sender address (defaults to Username) |
+| Send to | Recipient address |
+
+**Notify on** (any combination):
+- Voicemail received — sends email with MP3 attachment when a voicemail is recorded
+- Blocked call — sends email when a call is blocked
+- All calls — sends email for every call regardless of action
+
+### Gmail setup
+1. Enable **2-Step Verification** on your Google account
+2. Go to [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords) and create an App Password
+3. Use `smtp.gmail.com`, port `587`, your Gmail address, and the 16-character app password
+
+---
+
+## MQTT Notifications
+
+Call Attendant publishes a JSON message to your MQTT broker after every call. Configure in **Settings → MQTT Notifications**.
+
+### Home Assistant Integration
+
+A HACS custom integration is available to automatically create sensors and trigger automations in Home Assistant:
+
+**[CallAttendantNext Monitor — HACS Integration](https://github.com/foureight84/CallAttendantNext_Monitor)**
+
+### Payload format
+
+Published to `{topicPrefix}/call` (default: `callattendant/call`):
+
+```json
+{
+  "action": "Blocked",
+  "name": "SPAM CALLER",
+  "number": "8005551234",
+  "timestamp": "2026-03-29T17:30:00.000Z",
+  "reason": "Nomorobo: Robocall"
+}
+```
+
+The `voicemail` key is included only when a voicemail was recorded:
+
+```json
+{
+  "action": "Screened",
+  "name": "UNKNOWN",
+  "number": "5551234567",
+  "timestamp": "2026-03-29T17:31:00.000Z",
+  "reason": "Screened: not in whitelist or blacklist",
+  "voicemail": "msg_20260329_173100.mp3"
+}
+```
+
+| Field | Values |
+|-------|--------|
+| `action` | `Blocked`, `Screened`, `Permitted` |
+| `name` | Caller ID name, or `UNKNOWN` |
+| `number` | Caller ID number, or `ANONYMOUS` |
+| `timestamp` | ISO 8601 UTC |
+| `reason` | Screening decision detail |
+| `voicemail` | MP3 filename (only present when recorded) |
+
+Messages are fire-and-forget (`retain: false`). Each call produces exactly one message.
 
 ---
 

@@ -33,7 +33,7 @@ let ringTimeoutId: ReturnType<typeof setTimeout> | null = null;
 let preSynthesizedGreeting: Buffer[] | null = null;
 let preSynthesizedPleaseLeave: Buffer[] | null = null;
 // Tracks the current call's details for email notification sent on call-resolved.
-let pendingEmailData: { action: 'Permitted' | 'Blocked' | 'Screened'; name: string; number: string; date: string; time: string; reason: string; voicemailFilename?: string } | null = null;
+let pendingEmailData: { action: 'Permitted' | 'Blocked' | 'Screened'; name: string; number: string; date: string; time: string; systemDateTime: string; reason: string; voicemailFilename?: string } | null = null;
 
 function scheduleRingTimeout(): void {
   if (ringTimeoutId !== null) clearTimeout(ringTimeoutId);
@@ -255,7 +255,7 @@ async function handleRing(): Promise<void> {
   // pendingEmailData = null, so the module-level variable is gone by the time
   // we return here. The local snapshot still points to the same object, and
   // the voicemail filename is mutated onto it during goToVoicemail.
-  pendingEmailData = { action: screening.action, name: resolvedName, number, date, time, reason: screening.reason };
+  pendingEmailData = { action: screening.action, name: resolvedName, number, date, time, systemDateTime, reason: screening.reason };
   const emailSnapshot = pendingEmailData;
 
   if (screening.action === 'Blocked') {

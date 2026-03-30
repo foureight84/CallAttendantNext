@@ -60,7 +60,7 @@ export default function SettingsPage() {
   });
 
   useEffect(() => {
-    apiClient.settings.get().then(data => form.initialize(data));
+    apiClient.settings.get().then(data => form.initialize({ ...data, mqttTopicPrefix: data.mqttTopicPrefix || 'callattendant' }));
     fetch('/api/piper/models').then(r => r.json()).then(setModels).catch(() => {});
   }, []);
 

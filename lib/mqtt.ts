@@ -6,8 +6,7 @@ export interface CallMqttData {
   action: 'Permitted' | 'Blocked' | 'Screened';
   name: string;
   number: string;
-  date: string;
-  time: string;
+  systemDateTime: string;
   reason: string;
   voicemailFilename?: string;
 }
@@ -25,12 +24,11 @@ export async function publishCallMqtt(data: CallMqttData): Promise<void> {
 
   const topic = `${s.mqttTopicPrefix}/call`;
   const payload: Record<string, string> = {
-    action: data.action,
-    name:   data.name,
-    number: data.number,
-    date:   data.date,
-    time:   data.time,
-    reason: data.reason,
+    action:    data.action,
+    name:      data.name,
+    number:    data.number,
+    timestamp: data.systemDateTime,
+    reason:    data.reason,
   };
   if (data.voicemailFilename) payload.voicemail = data.voicemailFilename;
 
