@@ -46,6 +46,8 @@ If you have a hardware modem not on this list and would like support added, open
 
 ---
 
+# Getting Started
+
 ## Configuration (`.env`)
 
 Copy `.env.example` to `.env` and set your values:
@@ -69,8 +71,6 @@ cp .env.example .env
 All other keys are optional and fall back to sensible defaults.
 
 ---
-
-#Getting Started#
 
 ## Environment Variables
 
