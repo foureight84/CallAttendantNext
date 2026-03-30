@@ -375,6 +375,14 @@ export interface AppSettings {
   emailNotifyVoicemail: boolean;
   emailNotifyBlocked: boolean;
   emailNotifyAll: boolean;
+  mqttEnabled: boolean;
+  mqttBrokerUrl: string;
+  mqttUsername: string;
+  mqttPassword: string;
+  mqttTopicPrefix: string;
+  mqttNotifyVoicemail: boolean;
+  mqttNotifyBlocked: boolean;
+  mqttNotifyAll: boolean;
 }
 
 export async function getSettings(): Promise<AppSettings> {
@@ -408,6 +416,14 @@ export async function getSettings(): Promise<AppSettings> {
     emailNotifyVoicemail: (map['emailNotifyVoicemail'] ?? String(config.emailNotifyVoicemail)) === 'true',
     emailNotifyBlocked:   (map['emailNotifyBlocked']   ?? String(config.emailNotifyBlocked))   === 'true',
     emailNotifyAll:       (map['emailNotifyAll']       ?? String(config.emailNotifyAll))       === 'true',
+    mqttEnabled:          (map['mqttEnabled']          ?? String(config.mqttEnabled))          === 'true',
+    mqttBrokerUrl:         map['mqttBrokerUrl']         ?? config.mqttBrokerUrl,
+    mqttUsername:          map['mqttUsername']          ?? config.mqttUsername,
+    mqttPassword:          map['mqttPassword']          ?? config.mqttPassword,
+    mqttTopicPrefix:       map['mqttTopicPrefix']       ?? config.mqttTopicPrefix,
+    mqttNotifyVoicemail:  (map['mqttNotifyVoicemail']  ?? String(config.mqttNotifyVoicemail))  === 'true',
+    mqttNotifyBlocked:    (map['mqttNotifyBlocked']    ?? String(config.mqttNotifyBlocked))    === 'true',
+    mqttNotifyAll:        (map['mqttNotifyAll']        ?? String(config.mqttNotifyAll))        === 'true',
   };
 }
 

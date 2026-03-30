@@ -14,6 +14,8 @@ export default function SettingsPage() {
   const [previewing, setPreviewing] = useState(false);
   const [testingEmail, setTestingEmail] = useState(false);
   const [emailTestResult, setEmailTestResult] = useState<{ ok: boolean; error?: string } | null>(null);
+  const [testingMqtt, setTestingMqtt] = useState(false);
+  const [mqttTestResult, setMqttTestResult] = useState<{ ok: boolean; error?: string } | null>(null);
 
   const form = useForm<AppSettings>({
     initialValues: {
@@ -46,11 +48,19 @@ export default function SettingsPage() {
       emailNotifyVoicemail: true,
       emailNotifyBlocked: false,
       emailNotifyAll: false,
+      mqttEnabled: false,
+      mqttBrokerUrl: '',
+      mqttUsername: '',
+      mqttPassword: '',
+      mqttTopicPrefix: 'callattendant',
+      mqttNotifyVoicemail: true,
+      mqttNotifyBlocked: true,
+      mqttNotifyAll: false,
     },
   });
 
   useEffect(() => {
-    apiClient.settings.get().then(data => form.initialize(data));
+    apiClient.settings.get().then(data => form.initialize({ ...data, mqttTopicPrefix: data.mqttTopicPrefix || 'callattendant' }));
     fetch('/api/piper/models').then(r => r.json()).then(setModels).catch(() => {});
   }, []);
 
@@ -88,6 +98,22 @@ export default function SettingsPage() {
       setEmailTestResult({ ok: false, error: String(err) });
     } finally {
       setTestingEmail(false);
+    }
+  };
+
+  const handleTestMqtt = async () => {
+    setTestingMqtt(true);
+    setMqttTestResult(null);
+    try {
+      const { serialPort: _sp, serialBaudRate: _sbr, ...saveable } = form.values;
+      await apiClient.settings.save(saveable);
+      const res = await fetch('/api/mqtt/test', { method: 'POST' });
+      const data = await res.json() as { ok: boolean; error?: string };
+      setMqttTestResult(data);
+    } catch (err) {
+      setMqttTestResult({ ok: false, error: String(err) });
+    } finally {
+      setTestingMqtt(false);
     }
   };
 
@@ -374,6 +400,71 @@ export default function SettingsPage() {
                 {emailTestResult && (
                   <Alert color={emailTestResult.ok ? 'green' : 'red'} p="xs" style={{ flex: 1 }}>
                     {emailTestResult.ok ? 'Test email sent successfully.' : `Failed: ${emailTestResult.error}`}
+                  </Alert>
+                )}
+              </Group>
+            </Stack>
+          </Card>
+
+          <Card shadow="sm" padding="lg" radius="md" withBorder>
+            <Title order={4} mb="md">MQTT Notifications</Title>
+            <Stack gap="sm">
+              <Switch
+                label="Enable MQTT notifications"
+                {...form.getInputProps('mqttEnabled', { type: 'checkbox' })}
+              />
+
+              <TextInput
+                label="Broker URL"
+                placeholder="mqtt://homeassistant.local:1883"
+                description="Use mqtt:// for plain, mqtts:// for TLS."
+                {...form.getInputProps('mqttBrokerUrl')}
+              />
+              <Group grow>
+                <TextInput
+                  label="Username"
+                  placeholder="(optional)"
+                  {...form.getInputProps('mqttUsername')}
+                />
+                <PasswordInput
+                  label="Password"
+                  placeholder="(optional)"
+                  {...form.getInputProps('mqttPassword')}
+                />
+              </Group>
+              <TextInput
+                label="Topic prefix"
+                placeholder="callattendant"
+                description={`Publishes to {prefix}/call. Defaults to "callattendant".`}
+                {...form.getInputProps('mqttTopicPrefix')}
+              />
+
+              <Divider label="Notify on" labelPosition="left" />
+              <Switch
+                label="Voicemail received"
+                {...form.getInputProps('mqttNotifyVoicemail', { type: 'checkbox' })}
+              />
+              <Switch
+                label="Blocked call"
+                {...form.getInputProps('mqttNotifyBlocked', { type: 'checkbox' })}
+              />
+              <Switch
+                label="All calls (permitted, screened, blocked)"
+                {...form.getInputProps('mqttNotifyAll', { type: 'checkbox' })}
+              />
+
+              <Group>
+                <Button
+                  variant="default"
+                  loading={testingMqtt}
+                  disabled={!form.values.mqttBrokerUrl}
+                  onClick={handleTestMqtt}
+                >
+                  Test connection
+                </Button>
+                {mqttTestResult && (
+                  <Alert color={mqttTestResult.ok ? 'green' : 'red'} p="xs" style={{ flex: 1 }}>
+                    {mqttTestResult.ok ? 'Connected and test message published.' : `Failed: ${mqttTestResult.error}`}
                   </Alert>
                 )}
               </Group>
