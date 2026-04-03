@@ -1,3 +1,7 @@
+# Preface
+
+I wasn't aware of an existing maintained fork of the original project at the time of this release. If you stumbled across this project, https://github.com/thess/callattendant is being actively maintained.
+
 # Call Attendant Next
 
 A TypeScript/Next.js port of the [callattendant](https://github.com/emxsys/callattendant) Python project by Bruce Schubert — an automated call screener and voicemail system for landlines using a USB modem.
