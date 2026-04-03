@@ -30,6 +30,7 @@ let isHandlingCall = false;
 let isWaitingForRings = false;
 let screeningPromise: Promise<{ action: 'Blocked' | 'Permitted' | 'Screened'; reason: string }> | null = null;
 let ringTimeoutId: ReturnType<typeof setTimeout> | null = null;
+let waitRingCount = 0; // rings received while waitForRings() is active
 let preSynthesizedGreeting: Buffer[] | null = null;
 let preSynthesizedPleaseLeave: Buffer[] | null = null;
 
@@ -187,6 +188,7 @@ async function handleRing(): Promise<void> {
     // Always refresh the ring timeout so it tracks the latest ring,
     // regardless of whether we are currently in waitForRings().
     scheduleRingTimeout();
+    if (isWaitingForRings) waitRingCount++;
     return;
   }
   ringCount++;
@@ -452,15 +454,22 @@ async function waitForRings(count: number): Promise<void> {
   if (count <= 0) return;
   modemLog('info', `Waiting for ${count} more ring(s)...`);
   isWaitingForRings = true;
+  waitRingCount = 0;
   // Arm a fresh timeout at the start of the wait. If rings stopped before
   // waitForRings() was entered (e.g. callee answered during screening), the
   // earlier ring timeout may have already fired harmlessly. Without this, the
   // loop would run to completion and kick off voicemail even though no further
   // rings arrived — matching Python's wait_for_rings() abort-on-silence logic.
   scheduleRingTimeout();
-  const waitMs = count * RING_INTERVAL_MS;
-  const start = Date.now();
-  while (isHandlingCall && Date.now() - start < waitMs) {
+  // Wait for `count` actual ring events rather than a fixed time duration.
+  // Previously this was a fixed countdown (count × RING_INTERVAL_MS), which
+  // caused a race: if the last ring arrived near the end of the window, the
+  // ring timeout that detects "another phone picked up" fired ~1s AFTER the
+  // countdown expired — too late to abort. Counting real rings means we only
+  // exit after the Nth ring is confirmed, so the ring timeout always has a
+  // full RING_INTERVAL_MS + RING_TIMEOUT_BUFFER_MS window to fire after the
+  // last ring before we proceed.
+  while (isHandlingCall && waitRingCount < count) {
     await sleep(100);
   }
   isWaitingForRings = false;
@@ -474,6 +483,7 @@ function resetCallState(): void {
   screeningPromise = null;
   preSynthesizedGreeting = null;
   preSynthesizedPleaseLeave = null;
+  waitRingCount = 0;
   if (ringTimeoutId !== null) {
     clearTimeout(ringTimeoutId);
     ringTimeoutId = null;
