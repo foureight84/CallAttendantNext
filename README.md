@@ -1,6 +1,6 @@
 # Preface
 
-I wasn't aware of an existing maintained fork of the original project at the time of this release. If you stumbled across this project, https://github.com/thess/callattendant is being actively maintained.
+I wasn't aware of an existing maintained fork of the original project at the time of this release. If you stumbled across this project but prefer the look and feel of the original project https://github.com/thess/callattendant is being actively maintained.
 
 # Call Attendant Next
 
