@@ -119,6 +119,20 @@ describe('CallerScreener — obvious spam patterns', () => {
   });
 });
 
+describe('CallerScreener — screening mode disabled', () => {
+  it('returns Screened when all screening modes are disabled', async () => {
+    vi.mocked(db.getSettings).mockResolvedValue(makeSettings({ screeningMode: [], blockService: 'NONE' }));
+
+    const result = await screener.screen('CALLER', '5551234567');
+
+    expect(result.action).toBe('Screened');
+    expect(result.reason).toBe('Unknown caller');
+    expect(vi.mocked(db.isBlacklisted)).not.toHaveBeenCalled();
+    expect(vi.mocked(db.isWhitelisted)).not.toHaveBeenCalled();
+    expect(mockNomoroboCheck).not.toHaveBeenCalled();
+  });
+});
+
 describe('CallerScreener — Nomorobo', () => {
   it('screens an unknown caller when Nomorobo returns score 0', async () => {
     vi.mocked(db.getSettings).mockResolvedValue(makeSettings());

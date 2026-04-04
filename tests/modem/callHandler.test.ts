@@ -196,6 +196,29 @@ describe('permitted caller', () => {
     );
   });
 
+  it('waits for ringsBeforeVm rings before going to voicemail', async () => {
+    handler = makeHandler({ ringsBeforeVm: 2 });
+    handler.start();
+    mockScreener.screen.mockResolvedValue({ action: 'Permitted', reason: 'Whitelisted' });
+
+    await mockModem.emit(ALICE);
+    const ring1Done = mockModem.emit({ type: 'RING' });
+
+    // Flush microtasks so ring 1 enters waitForRings(1)
+    await vi.advanceTimersByTimeAsync(0);
+    expect(mockModem.answer).not.toHaveBeenCalled();
+
+    // Ring 2 arrives — increments waitRingCount, unblocking waitForRings
+    await mockModem.emit({ type: 'RING' });
+
+    await driveToVoicemail(ring1Done);
+
+    expect(mockModem.answer).toHaveBeenCalledOnce();
+    expect(vi.mocked(db.insertCallLog)).toHaveBeenCalledWith(
+      expect.objectContaining({ Action: 'Permitted' }),
+    );
+  });
+
   it('discards recording when audio is too short (<8000 bytes)', async () => {
     mockScreener.screen.mockResolvedValue({ action: 'Permitted', reason: 'Whitelisted' });
     mockModem.getRecordedBuffer.mockReturnValue(Buffer.alloc(100));
@@ -226,6 +249,21 @@ describe('blocked caller', () => {
     expect(mockTts.synthesize).toHaveBeenCalled();
     expect(mockModem.hangUp).toHaveBeenCalledOnce();
     expect(mockModem.startRecording).not.toHaveBeenCalled();
+  });
+
+  it('sends blocked caller to voicemail after configured rings (action 3)', async () => {
+    handler = makeHandler({ blocklistAction: 3, ringsBeforeVmBlocklist: 0 });
+    handler.start();
+    mockScreener.screen.mockResolvedValue({ action: 'Blocked', reason: 'Blacklisted' });
+
+    await mockModem.emit(ALICE);
+    await driveToVoicemail(mockModem.emit({ type: 'RING' }));
+
+    expect(mockModem.answer).toHaveBeenCalledOnce();
+    expect(mockModem.startRecording).toHaveBeenCalledOnce();
+    expect(vi.mocked(db.insertCallLog)).toHaveBeenCalledWith(
+      expect.objectContaining({ Action: 'Blocked' }),
+    );
   });
 
   it('hangs up silently without any greeting (action 1)', async () => {
