@@ -24,58 +24,65 @@ function waitForClose(proc: ReturnType<typeof spawn>, name: string): Promise<voi
   );
 }
 
-/**
- * Synthesize text using the Piper binary and ffmpeg, yielding
- * 8-bit unsigned PCM chunks at 8000 Hz suitable for modem playback.
- */
-export async function* synthesize(text: string, modelPath: string, lengthScale = 1.0): AsyncGenerator<Buffer> {
-  const sampleRate = await getModelSampleRate(modelPath);
+export class TtsEngine {
+  /**
+   * Synthesize text using the Piper binary and ffmpeg, yielding
+   * 8-bit unsigned PCM chunks at 8000 Hz suitable for modem playback.
+   */
+  async *synthesize(text: string, modelPath: string, lengthScale = 1.0): AsyncGenerator<Buffer> {
+    const sampleRate = await getModelSampleRate(modelPath);
 
-  const piper = spawn(config.piperBinary, ['--model', modelPath, '--output-raw', '--length-scale', String(lengthScale)], { env: piperEnv() });
-  const ffmpeg = spawn('ffmpeg', [
-    '-f', 's16le', '-ar', String(sampleRate), '-ac', '1', '-i', 'pipe:0',
-    '-f', 'u8', '-ar', '8000', '-ac', '1',
-    '-af', 'highpass=f=300,lowpass=f=3400',
-    'pipe:1',
-  ]);
+    const piper = spawn(config.piperBinary, ['--model', modelPath, '--output-raw', '--length-scale', String(lengthScale)], { env: piperEnv() });
+    const ffmpeg = spawn('ffmpeg', [
+      '-f', 's16le', '-ar', String(sampleRate), '-ac', '1', '-i', 'pipe:0',
+      '-f', 'u8', '-ar', '8000', '-ac', '1',
+      '-af', 'highpass=f=300,lowpass=f=3400',
+      'pipe:1',
+    ]);
 
-  // Register close listeners immediately to avoid missing the event
-  const done = Promise.all([waitForClose(piper, 'piper'), waitForClose(ffmpeg, 'ffmpeg')]);
+    // Register close listeners immediately to avoid missing the event
+    const done = Promise.all([waitForClose(piper, 'piper'), waitForClose(ffmpeg, 'ffmpeg')]);
 
-  piper.stdout.pipe(ffmpeg.stdin);
-  piper.stdin.write(text);
-  piper.stdin.end();
+    piper.stdout.pipe(ffmpeg.stdin);
+    piper.stdin.write(text);
+    piper.stdin.end();
 
-  for await (const chunk of ffmpeg.stdout) {
-    yield chunk as Buffer;
+    for await (const chunk of ffmpeg.stdout) {
+      yield chunk as Buffer;
+    }
+
+    await done;
   }
 
-  await done;
+  /**
+   * Synthesize text to WAV format for browser audio preview.
+   */
+  async *synthesizeWav(text: string, modelPath: string, lengthScale = 1.0): AsyncGenerator<Buffer> {
+    const sampleRate = await getModelSampleRate(modelPath);
+
+    const piper = spawn(config.piperBinary, ['--model', modelPath, '--output-raw', '--length-scale', String(lengthScale)], { env: piperEnv() });
+    const ffmpeg = spawn('ffmpeg', [
+      '-f', 's16le', '-ar', String(sampleRate), '-ac', '1', '-i', 'pipe:0',
+      '-f', 'wav', '-ar', '22050', '-ac', '1',
+      'pipe:1',
+    ]);
+
+    // Register close listeners immediately to avoid missing the event
+    const done = Promise.all([waitForClose(piper, 'piper'), waitForClose(ffmpeg, 'ffmpeg')]);
+
+    piper.stdout.pipe(ffmpeg.stdin);
+    piper.stdin.write(text);
+    piper.stdin.end();
+
+    for await (const chunk of ffmpeg.stdout) {
+      yield chunk as Buffer;
+    }
+
+    await done;
+  }
 }
 
-/**
- * Synthesize text to WAV format for browser audio preview.
- */
+// Standalone export for the piper/preview API route (app/api/[[...slug]]/route.ts)
 export async function* synthesizeWav(text: string, modelPath: string, lengthScale = 1.0): AsyncGenerator<Buffer> {
-  const sampleRate = await getModelSampleRate(modelPath);
-
-  const piper = spawn(config.piperBinary, ['--model', modelPath, '--output-raw', '--length-scale', String(lengthScale)], { env: piperEnv() });
-  const ffmpeg = spawn('ffmpeg', [
-    '-f', 's16le', '-ar', String(sampleRate), '-ac', '1', '-i', 'pipe:0',
-    '-f', 'wav', '-ar', '22050', '-ac', '1',
-    'pipe:1',
-  ]);
-
-  // Register close listeners immediately to avoid missing the event
-  const done = Promise.all([waitForClose(piper, 'piper'), waitForClose(ffmpeg, 'ffmpeg')]);
-
-  piper.stdout.pipe(ffmpeg.stdin);
-  piper.stdin.write(text);
-  piper.stdin.end();
-
-  for await (const chunk of ffmpeg.stdout) {
-    yield chunk as Buffer;
-  }
-
-  await done;
+  yield* new TtsEngine().synthesizeWav(text, modelPath, lengthScale);
 }
