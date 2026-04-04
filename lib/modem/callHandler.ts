@@ -27,6 +27,7 @@ export class CallHandler {
   private waitRingCount = 0;
   private preSynthesizedGreeting: Buffer[] | null = null;
   private preSynthesizedPleaseLeave: Buffer[] | null = null;
+  private started = false;
 
   constructor(
     private readonly modem: Modem,
@@ -37,6 +38,8 @@ export class CallHandler {
   ) {}
 
   start(): void {
+    if (this.started) return;
+    this.started = true;
     this.modem.on(async (event) => {
       try {
         switch (event.type) {
@@ -105,7 +108,12 @@ export class CallHandler {
       // Fall through to process the call now, before ring 2
     }
 
-    // Lock immediately before any await to prevent concurrent ring handlers
+    // Lock before any further awaits.
+    // Intentionally placed AFTER waitForScreeningWithTimeout() on ring 1: if no
+    // caller ID arrived within 3.5s, ring 1 returned early without locking, so
+    // ring 2 enters as a full handler (the UNKNOWN fallback path). This is safe
+    // because modem events are dispatched serially from a single serial port
+    // listener — two ring handlers cannot interleave at this point in practice.
     this.isHandlingCall = true;
 
     await this.gpio.blinkLed(GpioController.PINS.RING, 1);
@@ -165,8 +173,8 @@ export class CallHandler {
     }
     if (voicemailFilename) emailSnapshot.voicemailFilename = voicemailFilename;
     callEvents.emit('call-resolved', { action: screening.action, number });
-    sendCallEmail(emailSnapshot).catch(() => {});
-    publishCallMqtt(emailSnapshot).catch(() => {});
+    sendCallEmail(emailSnapshot).catch((err) => modemLog('warn', `Failed to send call email: ${err}`));
+    publishCallMqtt(emailSnapshot).catch((err) => modemLog('warn', `Failed to publish call MQTT: ${err}`));
   }
 
   private async handleBlockedCall(callLogId: number, currentRing: number, name: string, number: string): Promise<string | null> {
