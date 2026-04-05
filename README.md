@@ -34,6 +34,7 @@ If you have a hardware modem not on this list and would like support added, open
 - [Greeting Scripts](#greeting-scripts)
 - [SMTP Email Notifications](#smtp-email-notifications-1)
 - [MQTT Notifications](#mqtt-notifications-1)
+- [Robocall Blocklist Cleanup](#robocall-blocklist-cleanup)
 - [DTMF Opt-Out for Blocked Callers](#dtmf-opt-out-for-blocked-callers)
 - [Screenshots](#screenshots)
 
@@ -608,6 +609,36 @@ The `voicemail` key is included only when a voicemail was recorded:
 | `voicemail` | MP3 filename (only present when recorded) |
 
 Messages are fire-and-forget (`retain: false`). Each call produces exactly one message.
+
+---
+
+## Robocall Blocklist Cleanup
+
+Phone numbers flagged as robocallers don't stay with the same owner forever — numbers change hands, get recycled, and reassigned to legitimate individuals or businesses. A number that was a robocall last year may belong to a real person today. The blocklist cleanup feature periodically re-verifies entries that were added with **"Robocall"** as the reason against Nomorobo, and removes any that are no longer flagged.
+
+### How it works
+
+1. Call Attendant scans the blocklist for entries whose reason contains "robocall" (case-insensitive).
+2. Each number is checked against Nomorobo with a 10-second delay between lookups to avoid rate limiting.
+3. Numbers that are no longer flagged at or above the configured spam threshold are removed from the blocklist.
+4. Results are logged to the modem log so you can see exactly what was checked and removed.
+
+### Schedule
+
+The job runs on a configurable cron schedule (default: **Saturday at 2:00 AM**). The schedule uses standard 5-field cron syntax and can be changed in **Settings → Blocklist → Robocall Cleanup**.
+
+You can also trigger a manual run at any time with the **Run Now** button. Because the 10-second inter-lookup delay means a large blocklist can take a while, the UI shows how many numbers remain and an estimated time to completion while the job is running. The Run Now button is disabled while a run is in progress to prevent duplicate jobs.
+
+> **Note:** Only entries added with "Robocall" as the reason are re-verified. Numbers you manually added to the blocklist (e.g. with a custom reason like "Telemarketer") are never touched.
+
+### Enabling
+
+In the UI: **Settings → Blocklist → Robocall Cleanup**, or via environment variables:
+
+```
+ROBOCALL_CLEANUP_ENABLED=true
+ROBOCALL_CLEANUP_CRON=0 2 * * 6
+```
 
 ---
 
