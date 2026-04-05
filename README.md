@@ -231,6 +231,7 @@ PIPER_MODELS_DIR=./piper-models
 ### 2. Download a Voice Model
 
 Voice models are hosted on [Hugging Face — rhasspy/piper-voices](https://huggingface.co/rhasspy/piper-voices/tree/main).
+[Test out voice models](https://piper.ttstool.com/)
 
 Each voice requires **two files**:
 - `<model>.onnx` — the model weights
