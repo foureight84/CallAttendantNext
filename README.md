@@ -46,6 +46,7 @@ If you have a hardware modem not on this list and would like support added, open
 - **serialport** — serial communication with USB modem
 - **Piper TTS** — real-time speech synthesis for greetings
 - **ffmpeg** — voicemail encoding (MP3) and audio conversion
+- **Vitest** — unit and integration testing
 - **Docker** — containerized deployment
 
 ## What's New vs. the Original Python Project
