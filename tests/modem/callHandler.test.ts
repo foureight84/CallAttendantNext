@@ -93,6 +93,8 @@ const defaultSettings: AppSettings = {
   mqttNotifyVoicemail: false, mqttNotifyBlocked: false, mqttNotifyAll: false,
   robocallCleanupEnabled: false,
   robocallCleanupCron: '0 2 * * 6',
+  dtmfRemovalEnabled: false,
+  dtmfRemovalKey: '9',
 };
 
 const ALICE_INFO = { name: 'Alice', number: '5551234567', date: '0403', time: '1430' };

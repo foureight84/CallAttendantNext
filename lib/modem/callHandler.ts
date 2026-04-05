@@ -179,6 +179,7 @@ export class CallHandler {
 
   private async handleBlockedCall(callLogId: number, currentRing: number, name: string, number: string): Promise<string | null> {
     const settings = await getSettings();
+    const dtmfKey = settings.dtmfRemovalEnabled ? settings.dtmfRemovalKey : undefined;
 
     // Action 3: send to voicemail after N rings
     if (settings.blocklistAction === 3) {
@@ -186,7 +187,7 @@ export class CallHandler {
       modemLog('info', `Blocked caller — sending to voicemail after ${ringsLeft} more ring(s)`);
       await this.waitForRings(ringsLeft);
       if (!this.isHandlingCall) { modemLog('info', 'Blocked call aborted — caller hung up'); return null; }
-      const filename = await this.goToVoicemail(callLogId, 'general_greeting', settings.greetingVoice, settings.greetingLengthScale, name, number, settings.savePcmDebug);
+      const filename = await this.goToVoicemail(callLogId, 'general_greeting', settings.greetingVoice, settings.greetingLengthScale, name, number, settings.savePcmDebug, dtmfKey);
       await this.gpio.blinkLed(GpioController.PINS.BLOCKED, 1);
       return filename;
     }
@@ -206,6 +207,11 @@ export class CallHandler {
         modemLog('warn', `Could not play blocked greeting: ${err}`);
       }
       await sleep(500);
+    }
+
+    if (dtmfKey) {
+      modemLog('info', `Sending DTMF removal key '${dtmfKey}' to blocked caller`);
+      await this.modem.sendCommand(`AT+VTS=${dtmfKey}`, 1000);
     }
 
     await this.modem.hangUp();
@@ -239,7 +245,7 @@ export class CallHandler {
     return path.join(path.resolve(config.piperModelsDir), modelFilename);
   }
 
-  private async goToVoicemail(callLogId: number, greetingBasename: string, voice: string, lengthScale: number, name: string, number: string, savePcmDebug = false): Promise<string | null> {
+  private async goToVoicemail(callLogId: number, greetingBasename: string, voice: string, lengthScale: number, name: string, number: string, savePcmDebug = false, dtmfKey?: string): Promise<string | null> {
     modemLog('info', 'Answering call — entering voice mode (AT+FCLASS=8 → AT+VLS=1)...');
     try {
       await this.modem.answer();
@@ -280,7 +286,7 @@ export class CallHandler {
     }
 
     modemLog('info', 'Starting recording — playing beep then AT+VRX...');
-    await this.modem.startRecording();
+    await this.modem.startRecording(dtmfKey ? { dtmfKey } : undefined);
     modemLog('info', 'Recording voicemail...');
     callEvents.emit('recording-started');
 

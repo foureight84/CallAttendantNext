@@ -385,6 +385,8 @@ export interface AppSettings {
   mqttNotifyAll: boolean;
   robocallCleanupEnabled: boolean;
   robocallCleanupCron: string;
+  dtmfRemovalEnabled: boolean;
+  dtmfRemovalKey: string;
 }
 
 export async function getSettings(): Promise<AppSettings> {
@@ -428,6 +430,8 @@ export async function getSettings(): Promise<AppSettings> {
     mqttNotifyAll:        (map['mqttNotifyAll']        ?? String(config.mqttNotifyAll))        === 'true',
     robocallCleanupEnabled: (map['robocallCleanupEnabled'] ?? String(config.robocallCleanupEnabled)) === 'true',
     robocallCleanupCron:     map['robocallCleanupCron']    ?? config.robocallCleanupCron,
+    dtmfRemovalEnabled: (map['dtmfRemovalEnabled'] ?? String(config.dtmfRemovalEnabled)) === 'true',
+    dtmfRemovalKey:      map['dtmfRemovalKey']    ?? config.dtmfRemovalKey,
   };
 }
 
@@ -453,6 +457,8 @@ export async function seedSettingsFromEnv(): Promise<void> {
     savePcmDebug: config.savePcmDebug,
     robocallCleanupEnabled: config.robocallCleanupEnabled,
     robocallCleanupCron: config.robocallCleanupCron,
+    dtmfRemovalEnabled: config.dtmfRemovalEnabled,
+    dtmfRemovalKey: config.dtmfRemovalKey,
   });
 }
 

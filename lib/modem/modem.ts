@@ -543,7 +543,7 @@ export class Modem {
    * Other modems: same order but no VLS change (null VLS_RECORD_CMD).
    * If called standalone (no prior answer()), configure everything from scratch.
    */
-  async startRecording(): Promise<void> {
+  async startRecording(opts?: { dtmfKey?: string }): Promise<void> {
     this.voiceBuffer = [];
 
     if (!this.isOffHook || RESEND_SETUP_PER_OP[this.model]) {
@@ -556,8 +556,10 @@ export class Modem {
       await this.sendCommand('AT+VLS=1', 1000);
     }
 
-    // Beep first (per manual: VTS before VSD/VLS changes)
-    await this.sendCommand(VOICE_TONE_BEEP[this.model], 2000);
+    // Beep first (per manual: VTS before VSD/VLS changes).
+    // If a DTMF removal key is configured, send that tone instead of the standard beep.
+    const beepCmd = opts?.dtmfKey ? `AT+VTS=${opts.dtmfKey}` : VOICE_TONE_BEEP[this.model];
+    await this.sendCommand(beepCmd, 2000);
 
     // Switch silence detection to recording mode (USR: enable 5s hardware detection)
     await this.sendCommand(SILENCE_DETECTION_RECORD_CMD[this.model], 500);

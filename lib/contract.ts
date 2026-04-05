@@ -72,6 +72,8 @@ export const AppSettingsSchema = z.object({
   mqttNotifyAll:          z.boolean(),
   robocallCleanupEnabled: z.boolean(),
   robocallCleanupCron:    z.string(),
+  dtmfRemovalEnabled:     z.boolean(),
+  dtmfRemovalKey:         z.string(),
 });
 
 const OkSchema = z.object({ ok: z.literal(true) });

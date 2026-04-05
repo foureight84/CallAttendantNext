@@ -43,4 +43,6 @@ export const config = {
   mqttNotifyAll:        process.env.MQTT_NOTIFY_ALL         === 'true',
   robocallCleanupEnabled: process.env.ROBOCALL_CLEANUP_ENABLED === 'true',
   robocallCleanupCron:    process.env.ROBOCALL_CLEANUP_CRON ?? '0 2 * * 6',
+  dtmfRemovalEnabled: process.env.DTMF_REMOVAL_ENABLED === 'true',
+  dtmfRemovalKey:     process.env.DTMF_REMOVAL_KEY ?? '9',
 } as const;

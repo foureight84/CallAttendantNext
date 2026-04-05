@@ -80,6 +80,8 @@ export default function SettingsPage() {
       mqttNotifyAll: false,
       robocallCleanupEnabled: false,
       robocallCleanupCron: '0 2 * * 6',
+      dtmfRemovalEnabled: false,
+      dtmfRemovalKey: '9',
     },
   });
 
@@ -410,6 +412,32 @@ export default function SettingsPage() {
                   </Stack>
                 );
               })()}
+
+              <Divider mt="xs" />
+
+              <Group align="center" gap="sm">
+                <Switch
+                  {...form.getInputProps('dtmfRemovalEnabled', { type: 'checkbox' })}
+                />
+                <Text fw={500} size="sm">Send DTMF Removal Key</Text>
+              </Group>
+              <Text size="sm" c="dimmed">
+                The FCC requires telemarketers to maintain do-not-call lists and honor opt-out requests.
+                Many robocaller systems accept a DTMF keypress to remove your number — though compliance
+                is not guaranteed. When enabled, this key is sent to every blocked caller after the call
+                is answered.
+              </Text>
+              <Text size="sm" c="dimmed">
+                Most commonly used opt-out keys: <strong>9</strong> (most widely used), <strong>2</strong> (political/survey systems), <strong>*</strong> (some automated systems).
+              </Text>
+              <Select
+                label="Key to press"
+                data={['0','1','2','3','4','5','6','7','8','9','*','#'].map(k => ({ value: k, label: k }))}
+                disabled={!form.values.dtmfRemovalEnabled}
+                style={{ width: 120 }}
+                allowDeselect={false}
+                {...form.getInputProps('dtmfRemovalKey')}
+              />
             </Stack>
           </Card>
 
