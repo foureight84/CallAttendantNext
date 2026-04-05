@@ -1,6 +1,7 @@
 import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
 import '@mantine/charts/styles.css';
+import { ColorSchemeScript } from '@mantine/core';
 import { cookies } from 'next/headers';
 import { AppProviders } from '@/components/AppProviders';
 
@@ -13,6 +14,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>Call Attendant</title>
+        <ColorSchemeScript defaultColorScheme={colorScheme} />
       </head>
       <body suppressHydrationWarning>
         <AppProviders colorScheme={colorScheme}>{children}</AppProviders>

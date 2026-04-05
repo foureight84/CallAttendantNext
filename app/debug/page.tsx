@@ -13,6 +13,13 @@ const levelColor: Record<LogLevel, string> = {
   data: 'gray',
 };
 
+const levelTextColor: Record<LogLevel, string> = {
+  info: '#4dabf7',
+  warn: '#ffd43b',
+  error: '#ff6b6b',
+  data: '#868e96',
+};
+
 const COMMON_COMMANDS = ['ATI', 'ATZ', 'ATE0', 'AT+VCID=1', 'AT+FCLASS?', 'ATH', 'ATA', 'AT'];
 const MAX_LINES = 2000;
 
@@ -212,13 +219,11 @@ export default function DebugPage() {
               </Text>
             )}
             {filtered.map((entry, i) => (
-              <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 2, lineHeight: '1.5' }}>
-                <span style={{ color: '#666', flexShrink: 0 }}>
-                  {new Date(entry.ts).toLocaleTimeString()}
-                </span>
-                <Badge color={levelColor[entry.level]} size="xs" variant="light" style={{ flexShrink: 0, alignSelf: 'center' }}>
-                  {entry.level}
-                </Badge>
+              <div key={i} style={{ marginBottom: 2, lineHeight: '1.5' }}>
+                <span style={{ color: '#666' }}>{new Date(entry.ts).toLocaleTimeString()}</span>
+                {' '}
+                <span style={{ color: levelTextColor[entry.level] }}>[{entry.level}]</span>
+                {' '}
                 <span style={{ wordBreak: 'break-all' }}>{entry.msg}</span>
               </div>
             ))}

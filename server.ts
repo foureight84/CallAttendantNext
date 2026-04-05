@@ -18,6 +18,7 @@ const server = createServer((req, res) => {
   handle(req, res, parsedUrl);
 });
 
+server.setMaxListeners(20);
 server.listen(config.port, () => {
   console.log(`[server] Listening on http://localhost:${config.port}`);
 });
