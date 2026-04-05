@@ -34,6 +34,8 @@ If you have a hardware modem not on this list and would like support added, open
 - [Greeting Scripts](#greeting-scripts)
 - [SMTP Email Notifications](#smtp-email-notifications-1)
 - [MQTT Notifications](#mqtt-notifications-1)
+- [Robocall Blocklist Cleanup](#robocall-blocklist-cleanup)
+- [DTMF Opt-Out for Blocked Callers](#dtmf-opt-out-for-blocked-callers)
 - [Screenshots](#screenshots)
 
 ---
@@ -132,6 +134,10 @@ All other keys are optional and fall back to sensible defaults.
 | `RINGS_BEFORE_VM_SCREENED` | `2` | Rings before answering for screened (unknown) callers |
 | `BLOCKLIST_ACTION` | `2` | What to do with blacklisted callers: `1` = hang up silently, `2` = play blocked greeting then hang up, `3` = send to voicemail after N rings |
 | `RINGS_BEFORE_VM_BLOCKLIST` | `0` | Rings before voicemail for blacklisted callers when `BLOCKLIST_ACTION=3` |
+| `ROBOCALL_CLEANUP_ENABLED` | `false` | Enable periodic re-verification of "Robocall" blocklist entries against Nomorobo. Numbers no longer flagged are removed |
+| `ROBOCALL_CLEANUP_CRON` | `0 2 * * 6` | Cron schedule for the cleanup job (5-field syntax, e.g. `0 2 * * 6` = Saturday 2am). Only used when `ROBOCALL_CLEANUP_ENABLED=true` |
+| `DTMF_REMOVAL_ENABLED` | `false` | Send a DTMF keypress to blocked callers to request opt-out from their calling list |
+| `DTMF_REMOVAL_KEY` | `9` | The DTMF key to send when `DTMF_REMOVAL_ENABLED=true`. Valid values: `0`–`9`, `*`, `#` |
 
 ### Piper TTS
 
@@ -605,6 +611,71 @@ The `voicemail` key is included only when a voicemail was recorded:
 | `voicemail` | MP3 filename (only present when recorded) |
 
 Messages are fire-and-forget (`retain: false`). Each call produces exactly one message.
+
+---
+
+## Robocall Blocklist Cleanup
+
+Phone numbers flagged as robocallers don't stay with the same owner forever — numbers change hands, get recycled, and reassigned to legitimate individuals or businesses. A number that was a robocall last year may belong to a real person today. The blocklist cleanup feature periodically re-verifies entries that were added with **"Robocall"** as the reason against Nomorobo, and removes any that are no longer flagged.
+
+### How it works
+
+1. Call Attendant scans the blocklist for entries whose reason contains "robocall" (case-insensitive).
+2. Each number is checked against Nomorobo with a 10-second delay between lookups to avoid rate limiting.
+3. Numbers that are no longer flagged at or above the configured spam threshold are removed from the blocklist.
+4. Results are logged to the modem log so you can see exactly what was checked and removed.
+
+### Schedule
+
+The job runs on a configurable cron schedule (default: **Saturday at 2:00 AM**). The schedule uses standard 5-field cron syntax and can be changed in **Settings → Blocklist → Robocall Cleanup**.
+
+You can also trigger a manual run at any time with the **Run Now** button. Because the 10-second inter-lookup delay means a large blocklist can take a while, the UI shows how many numbers remain and an estimated time to completion while the job is running. The Run Now button is disabled while a run is in progress to prevent duplicate jobs.
+
+> **Note:** Only entries added with "Robocall" as the reason are re-verified. Numbers you manually added to the blocklist (e.g. with a custom reason like "Telemarketer") are never touched.
+
+### Enabling
+
+In the UI: **Settings → Blocklist → Robocall Cleanup**, or via environment variables:
+
+```
+ROBOCALL_CLEANUP_ENABLED=true
+ROBOCALL_CLEANUP_CRON=0 2 * * 6
+```
+
+---
+
+## DTMF Opt-Out for Blocked Callers
+
+The FCC requires telemarketers to maintain do-not-call lists and honor removal requests. Many automated calling systems accept a DTMF keypress to remove your number from their list. Call Attendant can send this keypress automatically whenever a blocked caller is answered — before hanging up or recording a voicemail.
+
+> **Note:** Compliance is not guaranteed. Legitimate telemarketers are legally required to honor opt-out requests; robocallers and scammers typically do not.
+
+### How it works
+
+The key is sent after the call is answered, at the point that would normally play a tone or greeting. The exact behavior depends on the configured **Blocklist Action**:
+
+| Blocklist Action | Without DTMF removal | With DTMF removal |
+|-----------------|---------------------|-------------------|
+| `1` — Hang up silently | Answer → hang up | Answer → send DTMF key → hang up |
+| `2` — Play blocked greeting | Answer → greeting → hang up | Answer → greeting → send DTMF key → hang up |
+| `3` — Send to voicemail | Answer → greeting → beep → record | Answer → greeting → DTMF key (replaces beep) → record |
+
+### Common opt-out keys
+
+| Key | Usage |
+|-----|-------|
+| `9` | Most widely used — US robocallers and telemarketing systems |
+| `2` | Some political and survey call systems |
+| `*` | A small number of automated dialer systems |
+
+### Enabling
+
+In the UI: **Settings → Blocklist → Send DTMF Removal Key**, or via environment variables:
+
+```
+DTMF_REMOVAL_ENABLED=true
+DTMF_REMOVAL_KEY=9
+```
 
 ---
 

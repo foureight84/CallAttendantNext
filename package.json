@@ -1,6 +1,6 @@
 {
   "name": "callattendantnext",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "type": "module",
   "private": true,
   "scripts": {
@@ -34,6 +34,7 @@
     "@ts-rest/core": "^3.52.1",
     "@ts-rest/next": "^3.52.1",
     "cheerio": "^1.2.0",
+    "cron-parser": "^5.5.0",
     "drizzle-orm": "^0.45.1",
     "mqtt": "^5.15.1",
     "next": "^16.2.0",

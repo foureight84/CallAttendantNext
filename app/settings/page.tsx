@@ -1,12 +1,31 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Stack, Title, Card, Group, Text, Button, Slider, NumberInput, Switch, Select, MultiSelect, Divider, Radio, TextInput, Box, Anchor, Tabs, Code, PasswordInput, Alert } from '@mantine/core';
+import { useEffect, useRef, useState } from 'react';
+import { Stack, Title, Card, Group, Text, Button, Slider, NumberInput, Switch, Select, MultiSelect, Divider, Radio, TextInput, Box, Anchor, Tabs, Code, PasswordInput, Alert, Loader } from '@mantine/core';
 import Link from 'next/link';
 import { notifications } from '@mantine/notifications';
 import { useForm } from '@mantine/form';
+import { CronExpressionParser } from 'cron-parser';
 import { apiClient } from '@/lib/api-client';
 import type { AppSettings } from '@/lib/contract';
+
+function parseCronFields(expr: string): [string, string, string, string, string] {
+  const parts = expr.trim().split(/\s+/);
+  return [parts[0] ?? '*', parts[1] ?? '*', parts[2] ?? '*', parts[3] ?? '*', parts[4] ?? '*'];
+}
+
+function getNextRunPreview(expr: string): string {
+  try {
+    const next = CronExpressionParser.parse(expr).next().toDate();
+    return `Next run: ${next.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} at ${next.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`;
+  } catch {
+    return 'Invalid cron expression';
+  }
+}
+
+function isCronValid(expr: string): boolean {
+  try { CronExpressionParser.parse(expr); return true; } catch { return false; }
+}
 
 export default function SettingsPage() {
   const [models, setModels] = useState<string[]>([]);
@@ -16,6 +35,9 @@ export default function SettingsPage() {
   const [emailTestResult, setEmailTestResult] = useState<{ ok: boolean; error?: string } | null>(null);
   const [testingMqtt, setTestingMqtt] = useState(false);
   const [mqttTestResult, setMqttTestResult] = useState<{ ok: boolean; error?: string } | null>(null);
+  const [cleanupRunning, setCleanupRunning] = useState(false);
+  const [cleanupPendingCount, setCleanupPendingCount] = useState(0);
+  const cleanupPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const form = useForm<AppSettings>({
     initialValues: {
@@ -56,12 +78,26 @@ export default function SettingsPage() {
       mqttNotifyVoicemail: true,
       mqttNotifyBlocked: true,
       mqttNotifyAll: false,
+      robocallCleanupEnabled: false,
+      robocallCleanupCron: '0 2 * * 6',
+      dtmfRemovalEnabled: false,
+      dtmfRemovalKey: '9',
     },
   });
 
   useEffect(() => {
     apiClient.settings.get().then(data => form.initialize({ ...data, mqttTopicPrefix: data.mqttTopicPrefix || 'callattendant' }));
     fetch('/api/piper/models').then(r => r.json()).then(setModels).catch(() => {});
+    fetch('/api/blacklist/cleanup').then(r => r.json()).then((d: { running: boolean; pendingCount: number }) => {
+      setCleanupRunning(d.running);
+      setCleanupPendingCount(d.pendingCount);
+    }).catch(() => {});
+    return () => {
+      if (cleanupPollRef.current) {
+        clearInterval(cleanupPollRef.current);
+        cleanupPollRef.current = null;
+      }
+    };
   }, []);
 
   const handlePreview = async () => {
@@ -115,6 +151,25 @@ export default function SettingsPage() {
     } finally {
       setTestingMqtt(false);
     }
+  };
+
+  const handleRunNow = async () => {
+    setCleanupRunning(true);
+    try {
+      await fetch('/api/blacklist/cleanup', { method: 'POST' });
+    } catch { /* ignore — cleanup runs in background */ }
+    cleanupPollRef.current = setInterval(async () => {
+      try {
+        const res = await fetch('/api/blacklist/cleanup');
+        const d = await res.json() as { running: boolean; pendingCount: number };
+        setCleanupRunning(d.running);
+        setCleanupPendingCount(d.pendingCount);
+        if (!d.running) {
+          if (cleanupPollRef.current) { clearInterval(cleanupPollRef.current); cleanupPollRef.current = null; }
+          notifications.show({ title: 'Cleanup complete', message: 'Robocall blocklist cleanup finished.', color: 'green', autoClose: 4000 });
+        }
+      } catch { /* network error — keep polling */ }
+    }, 5000);
   };
 
   const save = form.onSubmit(async (values) => {
@@ -204,6 +259,32 @@ export default function SettingsPage() {
                 ]}
                 {...form.getInputProps('screeningMode')}
               />
+            </Stack>
+          </Card>
+
+          <Card shadow="sm" padding="lg" radius="md" withBorder>
+            <Title order={4} mb="md">Voicemail</Title>
+            <Stack gap="sm">
+              <NumberInput
+                label="Rings Before Voicemail (permitted callers)"
+                description="How many rings before sending a phonebook caller to voicemail."
+                min={1}
+                max={10}
+                {...form.getInputProps('ringsBeforeVm')}
+              />
+              <NumberInput
+                label="Rings Before Voicemail (unknown callers)"
+                description="How many rings before sending an unrecognized or screened caller to voicemail."
+                min={1}
+                max={10}
+                {...form.getInputProps('ringsBeforeVmScreened')}
+              />
+            </Stack>
+          </Card>
+
+          <Card shadow="sm" padding="lg" radius="md" withBorder>
+            <Title order={4} mb="md">Robocall Detection</Title>
+            <Stack gap="sm">
               <Select
                 label="Block Service"
                 data={[
@@ -243,26 +324,6 @@ export default function SettingsPage() {
           </Card>
 
           <Card shadow="sm" padding="lg" radius="md" withBorder>
-            <Title order={4} mb="md">Voicemail</Title>
-            <Stack gap="sm">
-              <NumberInput
-                label="Rings Before Voicemail (permitted callers)"
-                description="How many rings before sending a phonebook caller to voicemail."
-                min={1}
-                max={10}
-                {...form.getInputProps('ringsBeforeVm')}
-              />
-              <NumberInput
-                label="Rings Before Voicemail (unknown callers)"
-                description="How many rings before sending an unrecognized or screened caller to voicemail."
-                min={1}
-                max={10}
-                {...form.getInputProps('ringsBeforeVmScreened')}
-              />
-            </Stack>
-          </Card>
-
-          <Card shadow="sm" padding="lg" radius="md" withBorder>
             <Title order={4} mb="md">Blocklist</Title>
             <Stack gap="sm">
               <Radio.Group
@@ -284,6 +345,110 @@ export default function SettingsPage() {
                 max={10}
                 disabled={form.values.blocklistAction !== 3}
                 {...form.getInputProps('ringsBeforeVmBlocklist')}
+              />
+
+              <Divider mt="xs" />
+
+              <Group align="center" gap="sm">
+                <Switch
+                  {...form.getInputProps('robocallCleanupEnabled', { type: 'checkbox' })}
+                />
+                <Text fw={500} size="sm">Robocall Cleanup</Text>
+              </Group>
+              <Text size="sm" c="dimmed">
+                Phone numbers can change hands over time. This cleanup periodically re-checks blocklist entries
+                that were added with &quot;Robocall&quot; as the reason against Nomorobo. Numbers that are no longer
+                flagged are automatically removed from your blocklist.
+              </Text>
+
+              {form.values.robocallCleanupEnabled && (() => {
+                const fields = parseCronFields(form.values.robocallCleanupCron);
+                const setField = (i: number, v: string) => {
+                  const next = [...fields] as [string, string, string, string, string];
+                  next[i] = v;
+                  form.setFieldValue('robocallCleanupCron', next.join(' '));
+                };
+                const valid = isCronValid(form.values.robocallCleanupCron);
+                const estSecs = cleanupPendingCount * 10;
+                const fmtDuration = (s: number) => {
+                  const h = Math.floor(s / 3600);
+                  const m = Math.floor((s % 3600) / 60);
+                  const sec = s % 60;
+                  const parts = [];
+                  if (h > 0) parts.push(`${h}h`);
+                  if (m > 0) parts.push(`${m}m`);
+                  if (sec > 0 || parts.length === 0) parts.push(`${sec}s`);
+                  return parts.join(' ');
+                };
+                return (
+                  <Stack gap="xs">
+                    <Group gap="xs" wrap="nowrap">
+                      {(['Minute', 'Hour', 'Day', 'Month', 'Weekday'] as const).map((label, i) => (
+                        <TextInput
+                          key={label}
+                          label={label}
+                          value={fields[i]}
+                          onChange={e => setField(i, e.currentTarget.value)}
+                          style={{ width: 72 }}
+                          styles={{ input: { fontFamily: 'monospace', textAlign: 'center' } }}
+                        />
+                      ))}
+                    </Group>
+                    <Text size="xs" c={valid ? 'dimmed' : 'red'}>
+                      {valid ? getNextRunPreview(form.values.robocallCleanupCron) : 'Invalid cron expression'}
+                    </Text>
+                    <Group gap="sm" align="center">
+                      <Button
+                        size="xs"
+                        variant="default"
+                        disabled={cleanupRunning || !valid || form.isDirty('robocallCleanupEnabled') || form.isDirty('robocallCleanupCron')}
+                        onClick={handleRunNow}
+                        leftSection={cleanupRunning ? <Loader size={12} /> : undefined}
+                      >
+                        {cleanupRunning ? 'Cleanup in progress…' : 'Run Now'}
+                      </Button>
+                      {cleanupRunning && cleanupPendingCount > 0 && (
+                        <Text size="xs" c="dimmed">
+                          {cleanupPendingCount} remaining · ~{fmtDuration(estSecs)} left
+                        </Text>
+                      )}
+                      {!cleanupRunning && cleanupPendingCount > 0 && (
+                        <Text size="xs" c="dimmed">
+                          {cleanupPendingCount} number{cleanupPendingCount === 1 ? '' : 's'} queued · ~{fmtDuration(estSecs)} to complete
+                        </Text>
+                      )}
+                      {!cleanupRunning && cleanupPendingCount === 0 && (
+                        <Text size="xs" c="dimmed">No robocall entries in blocklist</Text>
+                      )}
+                    </Group>
+                  </Stack>
+                );
+              })()}
+
+              <Divider mt="xs" />
+
+              <Group align="center" gap="sm">
+                <Switch
+                  {...form.getInputProps('dtmfRemovalEnabled', { type: 'checkbox' })}
+                />
+                <Text fw={500} size="sm">Send DTMF Removal Key</Text>
+              </Group>
+              <Text size="sm" c="dimmed">
+                The FCC requires telemarketers to maintain do-not-call lists and honor opt-out requests.
+                Many robocaller systems accept a DTMF keypress to remove your number — though compliance
+                is not guaranteed. When enabled, this key is sent to every blocked caller after the call
+                is answered.
+              </Text>
+              <Text size="sm" c="dimmed">
+                Most commonly used opt-out keys: <strong>9</strong> (most widely used), <strong>2</strong> (political/survey systems), <strong>*</strong> (some automated systems).
+              </Text>
+              <Select
+                label="Key to press"
+                data={['0','1','2','3','4','5','6','7','8','9','*','#'].map(k => ({ value: k, label: k }))}
+                disabled={!form.values.dtmfRemovalEnabled}
+                style={{ width: 120 }}
+                allowDeselect={false}
+                {...form.getInputProps('dtmfRemovalKey')}
               />
             </Stack>
           </Card>
@@ -501,7 +666,6 @@ export default function SettingsPage() {
               <Switch
                 label="Save PCM debug files"
                 description="Keep raw PCM recordings alongside MP3 voicemails. Enables a Download PCM button in the Voicemails page for analysis."
-                disabled={!form.values.debugConsole}
                 {...form.getInputProps('savePcmDebug', { type: 'checkbox' })}
               />
             </Stack>

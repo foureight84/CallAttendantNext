@@ -383,6 +383,10 @@ export interface AppSettings {
   mqttNotifyVoicemail: boolean;
   mqttNotifyBlocked: boolean;
   mqttNotifyAll: boolean;
+  robocallCleanupEnabled: boolean;
+  robocallCleanupCron: string;
+  dtmfRemovalEnabled: boolean;
+  dtmfRemovalKey: string;
 }
 
 export async function getSettings(): Promise<AppSettings> {
@@ -424,6 +428,10 @@ export async function getSettings(): Promise<AppSettings> {
     mqttNotifyVoicemail:  (map['mqttNotifyVoicemail']  ?? String(config.mqttNotifyVoicemail))  === 'true',
     mqttNotifyBlocked:    (map['mqttNotifyBlocked']    ?? String(config.mqttNotifyBlocked))    === 'true',
     mqttNotifyAll:        (map['mqttNotifyAll']        ?? String(config.mqttNotifyAll))        === 'true',
+    robocallCleanupEnabled: (map['robocallCleanupEnabled'] ?? String(config.robocallCleanupEnabled)) === 'true',
+    robocallCleanupCron:     map['robocallCleanupCron']    ?? config.robocallCleanupCron,
+    dtmfRemovalEnabled: (map['dtmfRemovalEnabled'] ?? String(config.dtmfRemovalEnabled)) === 'true',
+    dtmfRemovalKey:      map['dtmfRemovalKey']    ?? config.dtmfRemovalKey,
   };
 }
 
@@ -437,15 +445,32 @@ export async function saveSettings(s: Partial<AppSettings>): Promise<void> {
 }
 
 export async function seedSettingsFromEnv(): Promise<void> {
-  await saveSettings({
-    screeningMode: config.screeningMode, blockService: config.blockService,
-    spamThreshold: config.spamThreshold, ringsBeforeVm: config.ringsBeforeVm,
-    ringsBeforeVmScreened: config.ringsBeforeVmScreened,
-    blocklistAction: config.blocklistAction, ringsBeforeVmBlocklist: config.ringsBeforeVmBlocklist,
-    autoBlockSpam: config.autoBlockSpam,
-    enableGpio: config.enableGpio,
-    debugConsole: config.debugConsole,
-    diagnosticMode: config.diagnosticMode,
-    savePcmDebug: config.savePcmDebug,
-  });
+  // Only write settings whose env var is explicitly set.
+  // Unset env vars stay as-is in the DB so user-configured values survive restarts.
+  const e = process.env;
+  const seed: Partial<AppSettings> = {};
+
+  if (e.SCREENING_MODE              !== undefined) seed.screeningMode          = config.screeningMode;
+  if (e.BLOCK_SERVICE               !== undefined) seed.blockService           = config.blockService;
+  if (e.SPAM_THRESHOLD              !== undefined) seed.spamThreshold          = config.spamThreshold;
+  if (e.RINGS_BEFORE_VM             !== undefined) seed.ringsBeforeVm          = config.ringsBeforeVm;
+  if (e.RINGS_BEFORE_VM_SCREENED    !== undefined) seed.ringsBeforeVmScreened  = config.ringsBeforeVmScreened;
+  if (e.BLOCKLIST_ACTION            !== undefined) seed.blocklistAction        = config.blocklistAction;
+  if (e.RINGS_BEFORE_VM_BLOCKLIST   !== undefined) seed.ringsBeforeVmBlocklist = config.ringsBeforeVmBlocklist;
+  if (e.AUTO_BLOCK_SPAM             !== undefined) seed.autoBlockSpam          = config.autoBlockSpam;
+  if (e.ENABLE_GPIO                 !== undefined) seed.enableGpio             = config.enableGpio;
+  if (e.DEBUG_CONSOLE               !== undefined) seed.debugConsole           = config.debugConsole;
+  if (e.DIAGNOSTIC_MODE             !== undefined) seed.diagnosticMode         = config.diagnosticMode;
+  if (e.SAVE_PCM_DEBUG              !== undefined) seed.savePcmDebug           = config.savePcmDebug;
+  if (e.ROBOCALL_CLEANUP_ENABLED    !== undefined) seed.robocallCleanupEnabled = config.robocallCleanupEnabled;
+  if (e.ROBOCALL_CLEANUP_CRON       !== undefined) seed.robocallCleanupCron    = config.robocallCleanupCron;
+  if (e.DTMF_REMOVAL_ENABLED        !== undefined) seed.dtmfRemovalEnabled     = config.dtmfRemovalEnabled;
+  if (e.DTMF_REMOVAL_KEY            !== undefined) seed.dtmfRemovalKey         = config.dtmfRemovalKey;
+
+  if (Object.keys(seed).length > 0) await saveSettings(seed);
+}
+
+export async function getRobocallBlacklist(): Promise<typeof blacklist.$inferSelect[]> {
+  const rows = await db.select().from(blacklist).all();
+  return rows.filter(r => r.reason?.toLowerCase().includes('robocall'));
 }
