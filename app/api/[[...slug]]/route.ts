@@ -4,7 +4,7 @@ import {
   getWhitelist, getWhitelistCount, addToWhitelist, removeFromWhitelist,
   getBlacklist, getBlacklistCount, addToBlacklist, removeFromBlacklist,
   getMessages, getMessagesCount, markMessagePlayed, markMessageUnplayed, deleteMessage, getUnplayedMessageCount,
-  getSettings, saveSettings,
+  getSettings, saveSettings, getRobocallBlacklist,
 } from '@/lib/db';
 import { callEvents, updateLogConfig } from '@/lib/events';
 import { existsSync } from 'fs';
@@ -53,6 +53,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     const endDate   = searchParams.get('endDate')   ?? undefined;
     const [rows, total] = await Promise.all([getWhitelist(limit, offset, search, startDate, endDate), getWhitelistCount(search, startDate, endDate)]);
     return json({ rows, total });
+  }
+
+  if (route === 'blacklist/cleanup') {
+    const { isCleanupRunning } = await import('@/lib/modem/robocallCleanup');
+    const entries = await getRobocallBlacklist();
+    return json({ running: isCleanupRunning(), pendingCount: entries.length });
   }
 
   if (route === 'blacklist') {
@@ -107,6 +113,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
 export async function POST(req: NextRequest, { params }: { params: Promise<{ slug?: string[] }> }) {
   const { slug } = await params;
   const route = slug?.join('/') ?? '';
+
+  if (route === 'blacklist/cleanup') {
+    const { runRobocallCleanup } = await import('@/lib/modem/robocallCleanup');
+    runRobocallCleanup().catch(() => {});
+    return json({ ok: true });
+  }
+
   const body = await req.json();
 
   if (route === 'whitelist') {
@@ -123,6 +136,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     await saveSettings(body);
     const saved = await getSettings();
     updateLogConfig({ logFile: saved.logFile, logMaxBytes: saved.logMaxBytes, logKeepFiles: saved.logKeepFiles });
+    const { rescheduleRobocallCleanup } = await import('@/lib/modem/robocallCleanup');
+    rescheduleRobocallCleanup();
     return json({ ok: true });
   }
 

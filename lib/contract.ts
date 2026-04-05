@@ -70,6 +70,8 @@ export const AppSettingsSchema = z.object({
   mqttNotifyVoicemail:    z.boolean(),
   mqttNotifyBlocked:      z.boolean(),
   mqttNotifyAll:          z.boolean(),
+  robocallCleanupEnabled: z.boolean(),
+  robocallCleanupCron:    z.string(),
 });
 
 const OkSchema = z.object({ ok: z.literal(true) });
@@ -102,6 +104,8 @@ export const contract = c.router({
     list:   { method: 'GET',    path: '/api/blacklist', responses: { 200: z.array(ListEntrySchema) } },
     add:    { method: 'POST',   path: '/api/blacklist', body: z.object({ phoneNo: z.string(), name: z.string().optional(), reason: z.string().optional() }), responses: { 200: OkSchema } },
     remove: { method: 'DELETE', path: '/api/blacklist', body: z.object({ phoneNo: z.string() }), responses: { 200: OkSchema } },
+    cleanupStatus: { method: 'GET',  path: '/api/blacklist/cleanup', responses: { 200: z.object({ running: z.boolean(), pendingCount: z.number() }) } },
+    cleanup:       { method: 'POST', path: '/api/blacklist/cleanup', body: z.object({}), responses: { 200: OkSchema } },
   }),
   messages: c.router({
     list: {

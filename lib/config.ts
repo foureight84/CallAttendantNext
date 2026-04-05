@@ -41,4 +41,6 @@ export const config = {
   mqttNotifyVoicemail:  process.env.MQTT_NOTIFY_VOICEMAIL   !== 'false',
   mqttNotifyBlocked:    process.env.MQTT_NOTIFY_BLOCKED     !== 'false',
   mqttNotifyAll:        process.env.MQTT_NOTIFY_ALL         === 'true',
+  robocallCleanupEnabled: process.env.ROBOCALL_CLEANUP_ENABLED === 'true',
+  robocallCleanupCron:    process.env.ROBOCALL_CLEANUP_CRON ?? '0 2 * * 6',
 } as const;

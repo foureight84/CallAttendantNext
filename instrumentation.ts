@@ -11,5 +11,7 @@ export async function register() {
       const { startDaemon } = await import('./lib/modem');
       await startDaemon();
     }
+    const { scheduleRobocallCleanup } = await import('./lib/modem/robocallCleanup');
+    scheduleRobocallCleanup();
   }
 }

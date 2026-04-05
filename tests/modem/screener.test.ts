@@ -45,6 +45,8 @@ function makeSettings(overrides: Partial<AppSettings> = {}): AppSettings {
     emailNotifyVoicemail: false, emailNotifyBlocked: false, emailNotifyAll: false,
     mqttEnabled: false, mqttBrokerUrl: '', mqttUsername: '', mqttPassword: '',
     mqttTopicPrefix: '', mqttNotifyVoicemail: false, mqttNotifyBlocked: false, mqttNotifyAll: false,
+    robocallCleanupEnabled: false,
+    robocallCleanupCron: '0 2 * * 6',
     ...overrides,
   };
 }

@@ -383,6 +383,8 @@ export interface AppSettings {
   mqttNotifyVoicemail: boolean;
   mqttNotifyBlocked: boolean;
   mqttNotifyAll: boolean;
+  robocallCleanupEnabled: boolean;
+  robocallCleanupCron: string;
 }
 
 export async function getSettings(): Promise<AppSettings> {
@@ -424,6 +426,8 @@ export async function getSettings(): Promise<AppSettings> {
     mqttNotifyVoicemail:  (map['mqttNotifyVoicemail']  ?? String(config.mqttNotifyVoicemail))  === 'true',
     mqttNotifyBlocked:    (map['mqttNotifyBlocked']    ?? String(config.mqttNotifyBlocked))    === 'true',
     mqttNotifyAll:        (map['mqttNotifyAll']        ?? String(config.mqttNotifyAll))        === 'true',
+    robocallCleanupEnabled: (map['robocallCleanupEnabled'] ?? String(config.robocallCleanupEnabled)) === 'true',
+    robocallCleanupCron:     map['robocallCleanupCron']    ?? config.robocallCleanupCron,
   };
 }
 
@@ -447,5 +451,12 @@ export async function seedSettingsFromEnv(): Promise<void> {
     debugConsole: config.debugConsole,
     diagnosticMode: config.diagnosticMode,
     savePcmDebug: config.savePcmDebug,
+    robocallCleanupEnabled: config.robocallCleanupEnabled,
+    robocallCleanupCron: config.robocallCleanupCron,
   });
+}
+
+export async function getRobocallBlacklist(): Promise<typeof blacklist.$inferSelect[]> {
+  const rows = await db.select().from(blacklist).all();
+  return rows.filter(r => r.reason?.toLowerCase().includes('robocall'));
 }

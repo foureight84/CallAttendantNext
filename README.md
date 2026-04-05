@@ -132,6 +132,8 @@ All other keys are optional and fall back to sensible defaults.
 | `RINGS_BEFORE_VM_SCREENED` | `2` | Rings before answering for screened (unknown) callers |
 | `BLOCKLIST_ACTION` | `2` | What to do with blacklisted callers: `1` = hang up silently, `2` = play blocked greeting then hang up, `3` = send to voicemail after N rings |
 | `RINGS_BEFORE_VM_BLOCKLIST` | `0` | Rings before voicemail for blacklisted callers when `BLOCKLIST_ACTION=3` |
+| `ROBOCALL_CLEANUP_ENABLED` | `false` | Enable periodic re-verification of "Robocall" blocklist entries against Nomorobo. Numbers no longer flagged are removed |
+| `ROBOCALL_CLEANUP_CRON` | `0 2 * * 6` | Cron schedule for the cleanup job (5-field syntax, e.g. `0 2 * * 6` = Saturday 2am). Only used when `ROBOCALL_CLEANUP_ENABLED=true` |
 
 ### Piper TTS
 
