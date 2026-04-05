@@ -32,8 +32,8 @@ If you have a hardware modem not on this list and would like support added, open
 - [Bare Metal (Raspberry Pi / Linux)](#bare-metal-raspberry-pi--linux)
 - [Migrating from the Python callattendant](#migrating-from-the-python-callattendant)
 - [Greeting Scripts](#greeting-scripts)
-- [SMTP Email Notifications](#smtp-email-notifications)
-- [MQTT Notifications](#mqtt-notifications)
+- [SMTP Email Notifications](#smtp-email-notifications-1)
+- [MQTT Notifications](#mqtt-notifications-1)
 - [Screenshots](#screenshots)
 
 ---
