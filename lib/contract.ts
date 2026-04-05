@@ -1,5 +1,6 @@
 import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
+import { CronExpressionParser } from 'cron-parser';
 
 const c = initContract();
 
@@ -71,7 +72,7 @@ export const AppSettingsSchema = z.object({
   mqttNotifyBlocked:      z.boolean(),
   mqttNotifyAll:          z.boolean(),
   robocallCleanupEnabled: z.boolean(),
-  robocallCleanupCron:    z.string(),
+  robocallCleanupCron:    z.string().refine(val => { try { CronExpressionParser.parse(val); return true; } catch { return false; } }, { message: 'Invalid cron expression' }),
   dtmfRemovalEnabled:     z.boolean(),
   dtmfRemovalKey:         z.string(),
 });

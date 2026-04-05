@@ -211,9 +211,14 @@ export class CallHandler {
     }
 
     if (dtmfKey) {
-      modemLog('info', `Sending DTMF removal key '${dtmfKey}' to blocked caller`);
-      await this.modem.sendCommand(dtmfToneCmd(dtmfKey), 1000);
-      await sleep(120);
+      const cmd = dtmfToneCmd(dtmfKey);
+      if (cmd) {
+        modemLog('info', `Sending DTMF removal key '${dtmfKey}' to blocked caller`);
+        await this.modem.sendCommand(cmd, 1000);
+        await sleep(120);
+      } else {
+        modemLog('warn', `DTMF removal key '${dtmfKey}' not in frequency table — skipping`);
+      }
     }
 
     await this.modem.hangUp();

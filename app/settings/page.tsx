@@ -92,6 +92,12 @@ export default function SettingsPage() {
       setCleanupRunning(d.running);
       setCleanupPendingCount(d.pendingCount);
     }).catch(() => {});
+    return () => {
+      if (cleanupPollRef.current) {
+        clearInterval(cleanupPollRef.current);
+        cleanupPollRef.current = null;
+      }
+    };
   }, []);
 
   const handlePreview = async () => {

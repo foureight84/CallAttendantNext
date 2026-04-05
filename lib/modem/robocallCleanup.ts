@@ -88,6 +88,14 @@ export function scheduleRobocallCleanup(): void {
     }
 
     const delay = next.getTime() - Date.now();
+    // Node's setTimeout silently fires immediately for delays > 2^31-1 ms (~24.8 days).
+    // Guard against overflow for long cron intervals (e.g. yearly schedules).
+    const MAX_TIMEOUT_MS = 2 ** 31 - 1;
+    if (delay > MAX_TIMEOUT_MS) {
+      modemLog('warn', `[cleanup] Next run is more than 24 days away (${Math.round(delay / 86400000)}d). Rescheduling in 24h to avoid setTimeout overflow.`);
+      cleanupTimeoutId = setTimeout(() => scheduleRobocallCleanup(), 24 * 60 * 60 * 1000);
+      return;
+    }
     cleanupTimeoutId = setTimeout(async () => {
       await runRobocallCleanup();
       scheduleRobocallCleanup();

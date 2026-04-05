@@ -135,9 +135,12 @@ const DTMF_FREQS: Record<string, [number, number]> = {
 };
 
 // Build AT+VTS tone command for a DTMF key at 120 ms (12 × 10 ms).
-export function dtmfToneCmd(key: string): string {
+// All standard keys (0–9, *, #) are in DTMF_FREQS. Returns null for unknown keys
+// rather than falling back to AT+VTS=<digit>, which does not work on USR firmware.
+export function dtmfToneCmd(key: string): string | null {
   const freqs = DTMF_FREQS[key];
-  return freqs ? `AT+VTS=[${freqs[0]},${freqs[1]},12]` : `AT+VTS=${key}`;
+  if (!freqs) return null;
+  return `AT+VTS=[${freqs[0]},${freqs[1]},12]`;
 }
 
 // AT+VTS beep played after greeting, before recording.
@@ -581,9 +584,10 @@ export class Modem {
 
     // Beep first (per manual: VTS before VSD/VLS changes).
     // If a DTMF removal key is configured, send that tone instead of the standard beep.
-    const beepCmd = opts?.dtmfKey ? dtmfToneCmd(opts.dtmfKey) : VOICE_TONE_BEEP[this.model];
+    const dtmfCmd = opts?.dtmfKey ? dtmfToneCmd(opts.dtmfKey) : null;
+    const beepCmd = dtmfCmd ?? VOICE_TONE_BEEP[this.model];
     await this.sendCommand(beepCmd, 2000);
-    if (opts?.dtmfKey) await sleep(120);
+    if (dtmfCmd) await sleep(120);
 
     // Switch silence detection to recording mode (USR: enable 5s hardware detection)
     await this.sendCommand(SILENCE_DETECTION_RECORD_CMD[this.model], 500);
