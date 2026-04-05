@@ -253,6 +253,32 @@ export default function SettingsPage() {
                 ]}
                 {...form.getInputProps('screeningMode')}
               />
+            </Stack>
+          </Card>
+
+          <Card shadow="sm" padding="lg" radius="md" withBorder>
+            <Title order={4} mb="md">Voicemail</Title>
+            <Stack gap="sm">
+              <NumberInput
+                label="Rings Before Voicemail (permitted callers)"
+                description="How many rings before sending a phonebook caller to voicemail."
+                min={1}
+                max={10}
+                {...form.getInputProps('ringsBeforeVm')}
+              />
+              <NumberInput
+                label="Rings Before Voicemail (unknown callers)"
+                description="How many rings before sending an unrecognized or screened caller to voicemail."
+                min={1}
+                max={10}
+                {...form.getInputProps('ringsBeforeVmScreened')}
+              />
+            </Stack>
+          </Card>
+
+          <Card shadow="sm" padding="lg" radius="md" withBorder>
+            <Title order={4} mb="md">Robocall Detection</Title>
+            <Stack gap="sm">
               <Select
                 label="Block Service"
                 data={[
@@ -288,26 +314,6 @@ export default function SettingsPage() {
                   {...form.getInputProps('spamThreshold')}
                 />
               </div>
-            </Stack>
-          </Card>
-
-          <Card shadow="sm" padding="lg" radius="md" withBorder>
-            <Title order={4} mb="md">Voicemail</Title>
-            <Stack gap="sm">
-              <NumberInput
-                label="Rings Before Voicemail (permitted callers)"
-                description="How many rings before sending a phonebook caller to voicemail."
-                min={1}
-                max={10}
-                {...form.getInputProps('ringsBeforeVm')}
-              />
-              <NumberInput
-                label="Rings Before Voicemail (unknown callers)"
-                description="How many rings before sending an unrecognized or screened caller to voicemail."
-                min={1}
-                max={10}
-                {...form.getInputProps('ringsBeforeVmScreened')}
-              />
             </Stack>
           </Card>
 
@@ -654,7 +660,6 @@ export default function SettingsPage() {
               <Switch
                 label="Save PCM debug files"
                 description="Keep raw PCM recordings alongside MP3 voicemails. Enables a Download PCM button in the Voicemails page for analysis."
-                disabled={!form.values.debugConsole}
                 {...form.getInputProps('savePcmDebug', { type: 'checkbox' })}
               />
             </Stack>
