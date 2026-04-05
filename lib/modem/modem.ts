@@ -117,6 +117,29 @@ const PLAYBACK_VOLUME: Record<ModemModel, string> = {
   UNKNOWN:  'AT+VGT=200',
 };
 
+// DTMF key → [row_hz, col_hz] per ITU-T Q.23 (standard telephone keypad matrix).
+// Row frequencies:    697 Hz (1-3), 770 Hz (4-6), 852 Hz (7-9), 941 Hz (0/*/#)
+// Column frequencies: 1209 Hz (1/4/7/*), 1336 Hz (2/5/8/0), 1477 Hz (3/6/9), 1633 Hz (#)
+//
+// Covers all keys exposed in the settings UI (0–9, *, #).
+//
+// AT+VTS=[freq1,freq2,dur] is used instead of the digit shorthand (AT+VTS=9) because
+// USR firmware does not respond to the digit shorthand in AT command mode — it returns
+// nothing (timeout). The frequency-pair format is confirmed to work on all three supported
+// modem models (USR 5637, MT9234MU, Conexant).
+const DTMF_FREQS: Record<string, [number, number]> = {
+  '1': [697, 1209], '2': [697, 1336], '3': [697, 1477],
+  '4': [770, 1209], '5': [770, 1336], '6': [770, 1477],
+  '7': [852, 1209], '8': [852, 1336], '9': [852, 1477],
+  '0': [941, 1336], '*': [941, 1209], '#': [941, 1633],
+};
+
+// Build AT+VTS tone command for a DTMF key at 120 ms (12 × 10 ms).
+export function dtmfToneCmd(key: string): string {
+  const freqs = DTMF_FREQS[key];
+  return freqs ? `AT+VTS=[${freqs[0]},${freqs[1]},12]` : `AT+VTS=${key}`;
+}
+
 // AT+VTS beep played after greeting, before recording.
 //   Format: [freq1,freq2,duration×10ms]
 //   USR new firmware manual Example #7 shows [933,0,120] but freq2=0 is below the
@@ -558,8 +581,9 @@ export class Modem {
 
     // Beep first (per manual: VTS before VSD/VLS changes).
     // If a DTMF removal key is configured, send that tone instead of the standard beep.
-    const beepCmd = opts?.dtmfKey ? `AT+VTS=${opts.dtmfKey}` : VOICE_TONE_BEEP[this.model];
+    const beepCmd = opts?.dtmfKey ? dtmfToneCmd(opts.dtmfKey) : VOICE_TONE_BEEP[this.model];
     await this.sendCommand(beepCmd, 2000);
+    if (opts?.dtmfKey) await sleep(120);
 
     // Switch silence detection to recording mode (USR: enable 5s hardware detection)
     await this.sendCommand(SILENCE_DETECTION_RECORD_CMD[this.model], 500);

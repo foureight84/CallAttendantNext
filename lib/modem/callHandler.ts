@@ -12,6 +12,7 @@ import path from 'path';
 import { sleep } from '../sleep';
 import type { CallerIdInfo } from './callerIdParser';
 import type { Modem } from './modem';
+import { dtmfToneCmd } from './modem';
 import type { ScreeningResult } from './screener';
 
 const RING_INTERVAL_MS = 6000;
@@ -211,7 +212,8 @@ export class CallHandler {
 
     if (dtmfKey) {
       modemLog('info', `Sending DTMF removal key '${dtmfKey}' to blocked caller`);
-      await this.modem.sendCommand(`AT+VTS=${dtmfKey}`, 1000);
+      await this.modem.sendCommand(dtmfToneCmd(dtmfKey), 1000);
+      await sleep(120);
     }
 
     await this.modem.hangUp();
