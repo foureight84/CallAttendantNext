@@ -18,6 +18,26 @@ A TypeScript/Next.js port of the [callattendant](https://github.com/emxsys/calla
 
 If you have a hardware modem not on this list and would like support added, open an issue at [foureight84/CallAttendantNext](https://github.com/foureight84/CallAttendantNext/issues).
 
+## Table of Contents
+
+- [Supported Modems](#supported-modems)
+- [Stack](#stack)
+- [What's New vs. the Original Python Project](#whats-new-vs-the-original-python-project)
+- [Roadmap](#roadmap)
+- [Getting Started](#getting-started)
+  - [Configuration (.env)](#configuration-env)
+  - [Environment Variables](#environment-variables)
+  - [Piper TTS Setup](#piper-tts-setup)
+- [Docker](#docker)
+- [Bare Metal (Raspberry Pi / Linux)](#bare-metal-raspberry-pi--linux)
+- [Migrating from the Python callattendant](#migrating-from-the-python-callattendant)
+- [Greeting Scripts](#greeting-scripts)
+- [SMTP Email Notifications](#smtp-email-notifications)
+- [MQTT Notifications](#mqtt-notifications)
+- [Screenshots](#screenshots)
+
+---
+
 ## Stack
 
 - **Next.js 15** — frontend and API routes
@@ -65,27 +85,36 @@ cp .env.example .env
 - Subsequent runs: `.env` can override any setting back to a specific value
 - Settings changed via the web UI are stored in the database and take effect immediately, but will be overwritten on next restart if `.env` specifies that key
 
-**Only two keys are mandatory:**
+**Four keys are mandatory** — the app will start but will not function correctly without these:
 
-| Key | Description |
-|-----|-------------|
-| `SERIAL_PORT` | Path to your modem device (e.g. `/dev/ttyUSB0`, `/dev/tty.usbmodem*`, `COM3`) |
-| `SERIAL_BAUD_RATE` | Modem baud rate — `115200` for all supported modems |
+| Key | Example | Description |
+|-----|---------|-------------|
+| `SERIAL_PORT` | `/dev/tty.usbmodem00000021` | Path to your modem device (`/dev/ttyUSB0` on Linux, `/dev/tty.usbmodem*` on macOS, `COM3` on Windows) |
+| `SERIAL_BAUD_RATE` | `115200` | Modem baud rate — `115200` for MT9234MU/Conexant/ZOOM, `57600` for USR 5637 |
+| `PIPER_BINARY` | `./piper/piper` | Path to the Piper TTS binary — without this, no greeting will play during calls. See [Piper TTS Setup](#piper-tts-setup) |
+| `PIPER_MODELS_DIR` | `./piper-models` | Directory containing `.onnx` voice model files — without this, no voice is available for TTS. See [Piper TTS Setup](#piper-tts-setup) |
 
 All other keys are optional and fall back to sensible defaults.
 
 ---
 
-## Environment Variables
+<a name="environment-variables"></a>
+<details>
+<summary><strong>Environment Variables</strong></summary>
 
-All variables are optional except `SERIAL_PORT` and `SERIAL_BAUD_RATE`.
+### Required
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SERIAL_PORT` | `/dev/ttyUSB0` | Path to modem device (e.g. `/dev/ttyUSB0`, `/dev/tty.usbmodem*`, `COM3`) |
+| `SERIAL_BAUD_RATE` | `57600` | Modem baud rate — `115200` for MT9234MU/Conexant/ZOOM, `57600` for USR 5637 |
+| `PIPER_BINARY` | `piper` | Path to the Piper TTS binary — without this, no greeting plays during calls |
+| `PIPER_MODELS_DIR` | `./piper-models` | Directory containing `.onnx` voice model files — without this, no voice is available for TTS |
 
 ### Core
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SERIAL_PORT` | `/dev/ttyUSB0` | **Required.** Path to modem device (e.g. `/dev/ttyUSB0`, `/dev/tty.usbmodem*`, `COM3`) |
-| `SERIAL_BAUD_RATE` | `57600` | **Required.** Modem baud rate — `115200` recommended for all supported modems |
 | `PORT` | `3000` | HTTP port the web UI listens on |
 | `DB_PATH` | `./callattendant.db` | Path to the SQLite database file — do not change when using Docker |
 | `MESSAGES_DIR` | `./messages` | Directory where voicemail MP3 files are saved — do not change when using Docker |
@@ -107,8 +136,6 @@ All variables are optional except `SERIAL_PORT` and `SERIAL_BAUD_RATE`.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PIPER_BINARY` | `piper` | Path to the Piper binary. Set when running baremetal; Docker installs it automatically |
-| `PIPER_MODELS_DIR` | `./piper-models` | Directory containing `.onnx` voice model files (scanned automatically) |
 | `PIPER_LENGTH_SCALE` | `1.0` | Speech speed multiplier. `1.0` = normal speed; higher values slow speech down. Range: `1.0`–`1.5` |
 
 ### Logging
@@ -160,6 +187,8 @@ All variables are optional except `SERIAL_PORT` and `SERIAL_BAUD_RATE`.
 | `MQTT_NOTIFY_VOICEMAIL` | `true` | Publish MQTT message when a voicemail is recorded |
 | `MQTT_NOTIFY_BLOCKED` | `true` | Publish MQTT message when a call is blocked |
 | `MQTT_NOTIFY_ALL` | `false` | Publish MQTT message for every call regardless of action |
+
+</details>
 
 ---
 
