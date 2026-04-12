@@ -453,10 +453,18 @@ export class Modem {
 
   private async detectModel(): Promise<ModemModel> {
     const response = await this.sendCommand('ATI0', 1000);
-    if (response.includes('5601'))    { console.log('[modem] US Robotics 5637 detected');      return 'USR'; }
-    if (response.includes('56000'))   { console.log('[modem] Conexant-based modem detected');   return 'CONEXANT'; }
+    if (response.includes('5601'))     { console.log('[modem] US Robotics 5637 detected');     return 'USR'; }
+    if (response.includes('56000'))    { console.log('[modem] Conexant-based Zoom 3095 modem detected');  return 'CONEXANT'; }
     if (response.includes('MT9234MU')) { console.log('[modem] MT9234MU modem detected');        return 'MT9234MU'; }
-    console.log('[modem] Unknown modem — using USR-compatible defaults');
+
+    // ATI0 didn't match a known product code — try Conexant-specific identification.
+    // AT+GMI9 is a Conexant proprietary command that returns "CONEXANT ACF" on all
+    // CX930xx-based modems regardless of OEM product code (documented in both the
+    // Startech USB56KEMH2 and Zoom 3095 Conexant AT command manuals).
+    const gmi9 = await this.sendCommand('AT+GMI9', 1000);
+    if (gmi9.includes('CONEXANT'))     { console.log('[modem] Conexant-based modem detected via AT+GMI9'); return 'CONEXANT'; }
+
+    console.log('[modem] Unknown modem — falling back to UNKNOWN profile');
     return 'UNKNOWN';
   }
 
