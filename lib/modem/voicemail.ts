@@ -155,6 +155,13 @@ export class VoicemailRecorder {
   }
 
   private runFfmpeg(inputPath: string, outputPath: string): Promise<void> {
+    // Prefer arnndn (RNNoise neural network denoiser) for voice cleanup.
+    // Falls back to afftdn+anlmdn if the model file is not present.
+    const modelPath = path.join(process.cwd(), 'ffmpeg', 'arnndn', 'models', 'bd.rnnn');
+    const audioFilter = existsSync(modelPath)
+      ? `highpass=f=300,lowpass=f=3400,arnndn=model=${modelPath},agate=threshold=0.02:range=0.01:attack=10:release=100,speechnorm,loudnorm`
+      : `highpass=f=300,lowpass=f=3400,afftdn=nf=-20,anlmdn,agate=threshold=0.02:range=0.01:attack=10:release=100,speechnorm,loudnorm`;
+
     return new Promise((resolve, reject) => {
       const proc = spawn('ffmpeg', [
         '-y',           // overwrite output
@@ -162,6 +169,7 @@ export class VoicemailRecorder {
         '-ar', '8000',  // sample rate
         '-ac', '1',     // mono
         '-i', inputPath,
+        '-af', audioFilter,
         outputPath,
       ]);
 

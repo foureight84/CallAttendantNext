@@ -15,6 +15,7 @@ A TypeScript/Next.js port of the [callattendant](https://github.com/emxsys/calla
 | US Robotics USR5637 | 115200 | Requires firmware **1.2.23 or later** (check with `ATI7`). Older firmware cannot answer calls — the modem does not go off-hook in response to `AT+VLS=1`. Update via the [USR support page](https://www.usr.com/support/5637) if needed. |
 | MultiTech MT9234MU-CDC | 115200 — provides best voice quality | |
 | ZOOM 3095 | 115200 — provides best voice quality | |
+| Startech USB56KEMH2 | 115200 — provides best voice quality | Conexant CX93010-based |
 
 If you have a hardware modem not on this list and would like support added, open an issue at [foureight84/CallAttendantNext](https://github.com/foureight84/CallAttendantNext/issues).
 
@@ -28,6 +29,7 @@ If you have a hardware modem not on this list and would like support added, open
   - [Configuration (.env)](#configuration-env)
   - [Environment Variables](#environment-variables)
   - [Piper TTS Setup](#piper-tts-setup)
+- [Voicemail Audio Enhancement (RNNoise)](#voicemail-audio-enhancement-rnnoise)
 - [Docker](#docker)
 - [Bare Metal (Raspberry Pi / Linux)](#bare-metal-raspberry-pi--linux)
 - [Migrating from the Python callattendant](#migrating-from-the-python-callattendant)
@@ -257,6 +259,33 @@ wget -P piper-models https://huggingface.co/rhasspy/piper-voices/resolve/main/en
 Browse all available voices at: `https://huggingface.co/rhasspy/piper-voices/tree/main`
 
 After downloading, select the model in **Settings → Voice Model** and click **Play** to preview.
+
+---
+
+## Voicemail Audio Enhancement (RNNoise)
+
+Voicemail recordings are processed through an audio filter chain during MP3 conversion to reduce line noise, echo, and static inherent to telephone recordings. The chain uses ffmpeg's `arnndn` filter — a recurrent neural network denoiser trained specifically on speech.
+
+The model files are bundled in `ffmpeg/arnndn/models/` — no download required. They are not subject to copyright (neural network weights are not a creative work) and are derived from the [RNNoise](https://github.com/xiph/rnnoise) project by Jean-Marc Valin / Xiph.Org Foundation (BSD-3-Clause), via [richardpl/arnndn-models](https://github.com/richardpl/arnndn-models).
+
+### Available Models
+
+The default model is **`bd.rnnn`** — the best all-rounder for voicemail use.
+
+| Model | Signal type | Noise type | Best for |
+|-------|-------------|------------|----------|
+| `bd.rnnn` ⭐ | Voice (incl. coughs/laughs) | Recording noise | General voicemail — callers with background noise |
+| `sh.rnnn` | Pure speech | Recording noise | Quiet environments — caller speaking clearly |
+| `lq.rnnn` | Voice (incl. coughs/laughs) | General noise | Voice with ambient non-speech sounds |
+| `cb.rnnn` | General (music/effects) | Recording noise | Mixed audio |
+| `mp.rnnn` | General (music/effects) | General noise | Mixed audio in casual environments |
+| `std.rnnn` | Pure speech | General noise | Clean speech in typical indoor environments |
+
+> All models were trained on 48kHz audio but remain effective on the 8kHz mono audio produced by voice modems.
+
+### CPU overhead
+
+RNNoise is lightweight by design (~40 MFLOPS). It processes audio approximately 7× faster than real-time on a Raspberry Pi 3 and 60× faster on x86 — adding negligible overhead to post-call MP3 encoding.
 
 ---
 
