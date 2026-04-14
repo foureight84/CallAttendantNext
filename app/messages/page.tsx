@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Stack, Title, Card, Group, Text, Badge, Button, Select,
-  Pagination, TextInput, Checkbox, Box,
+  Pagination, TextInput, Checkbox, Box, Modal,
 } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
 import { AudioPlayer } from '@/components/AudioPlayer';
@@ -32,6 +32,7 @@ export default function MessagesPage() {
   const [startDate, setStartDate]   = useState('');
   const [endDate, setEndDate]       = useState('');
   const [unplayedOnly, setUnplayedOnly] = useState(false);
+  const [confirmMsg, setConfirmMsg] = useState<Message | null>(null);
 
   useEffect(() => {
     apiClient.whitelist.list({ limit: 10000 }).then(d => setWhitelist(d.rows));
@@ -66,6 +67,7 @@ export default function MessagesPage() {
 
   const deleteMessage = async (messageId: number) => {
     await apiClient.messages.delete({ messageId });
+    setConfirmMsg(null);
     load();
   };
 
@@ -184,7 +186,7 @@ export default function MessagesPage() {
                 {showPcmButton && msg.hasPcm && (
                   <Button size="xs" variant="light" color="orange" onClick={() => downloadPcm(msg)}>Download PCM</Button>
                 )}
-                <Button size="xs" variant="light" color="red" onClick={() => deleteMessage(msg.messageId)}>Delete</Button>
+                <Button size="xs" variant="light" color="red" onClick={() => setConfirmMsg(msg)}>Delete</Button>
               </Group>
             </Box>
           </Group>
@@ -205,7 +207,7 @@ export default function MessagesPage() {
               {msg.filename && showPcmButton && (
                 <Button size="xs" variant="light" color="orange" onClick={() => downloadPcm(msg)}>Download PCM</Button>
               )}
-              <Button size="xs" variant="light" color="red" onClick={() => deleteMessage(msg.messageId)}>Delete</Button>
+              <Button size="xs" variant="light" color="red" onClick={() => setConfirmMsg(msg)}>Delete</Button>
             </Group>
           </Box>
           {msg.filename && (
@@ -222,6 +224,23 @@ export default function MessagesPage() {
           <Pagination total={totalPages} value={page} onChange={setPage} />
         </Group>
       )}
+
+      <Modal
+        opened={confirmMsg !== null}
+        onClose={() => setConfirmMsg(null)}
+        title="Delete Voicemail"
+        size="sm"
+        centered
+      >
+        <Text size="sm" mb="lg">
+          Delete voicemail from <Text span fw={600}>{confirmMsg ? resolveName(confirmMsg, whitelist) : ''}</Text>
+          {confirmMsg?.number ? <> ({confirmMsg.number})</> : ''}? This cannot be undone.
+        </Text>
+        <Group justify="flex-end" gap="sm">
+          <Button variant="default" onClick={() => setConfirmMsg(null)}>Cancel</Button>
+          <Button color="red" onClick={() => confirmMsg && deleteMessage(confirmMsg.messageId)}>Delete</Button>
+        </Group>
+      </Modal>
     </Stack>
   );
 }

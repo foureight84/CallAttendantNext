@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   getCallLog, getCallLogCount, getCallTrend, getTopCallers, getTopBlockedCallers,
-  getWhitelist, getWhitelistCount, addToWhitelist, removeFromWhitelist,
-  getBlacklist, getBlacklistCount, addToBlacklist, removeFromBlacklist,
+  getWhitelist, getWhitelistCount, addToWhitelist, removeFromWhitelist, isWhitelisted,
+  getBlacklist, getBlacklistCount, addToBlacklist, removeFromBlacklist, isBlacklisted,
   getMessages, getMessagesCount, markMessagePlayed, markMessageUnplayed, deleteMessage, getUnplayedMessageCount,
   getSettings, saveSettings, getRobocallBlacklist,
 } from '@/lib/db';
-import { callEvents, updateLogConfig } from '@/lib/events';
+import { callEvents, modemLog, updateLogConfig } from '@/lib/events';
 import { existsSync } from 'fs';
 import { unlink, readdir } from 'fs/promises';
 import path from 'path';
@@ -181,12 +181,16 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ s
   const body = await req.json();
 
   if (route === 'whitelist') {
+    const entry = await isWhitelisted(body.phoneNo);
     await removeFromWhitelist(body.phoneNo);
+    modemLog('info', `Phonebook: removed ${body.phoneNo}${entry?.name ? ` (${entry.name})` : ''}`);
     return json({ ok: true });
   }
 
   if (route === 'blacklist') {
+    const entry = await isBlacklisted(body.phoneNo);
     await removeFromBlacklist(body.phoneNo);
+    modemLog('info', `Blocklist: removed ${body.phoneNo}${entry?.name ? ` (${entry.name})` : ''}`);
     return json({ ok: true });
   }
 
@@ -194,6 +198,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ s
     const msg = await deleteMessage(body.messageId);
     if (msg?.filename) {
       await unlink(path.join(config.messagesDir, msg.filename)).catch(() => {});
+      modemLog('info', `Voicemail: deleted ${msg.filename}`);
     }
     return json({ ok: true });
   }

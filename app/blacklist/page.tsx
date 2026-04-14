@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Stack, Title, Table, Button, Group, Text, TextInput, Select, Pagination, Card, Box } from '@mantine/core';
+import { Stack, Title, Table, Button, Group, Text, TextInput, Select, Pagination, Card, Box, Modal } from '@mantine/core';
 import { useDebouncedValue, useDisclosure } from '@mantine/hooks';
 import { AddToListModal } from '@/components/AddToListModal';
 import { apiClient } from '@/lib/api-client';
@@ -34,6 +34,7 @@ export default function BlacklistPage() {
   const [settings, setSettings]   = useState<AppSettings | null>(null);
   const [opened, { open, close }] = useDisclosure(false);
   const [editEntry, setEditEntry] = useState<ListEntry | null>(null);
+  const [confirmEntry, setConfirmEntry] = useState<ListEntry | null>(null);
 
   const load = () =>
     apiClient.blacklist.list({ limit: pageSize, offset: (page - 1) * pageSize, search: debouncedSearch || undefined, startDate: startDate ? new Date(`${startDate}T00:00:00`).toISOString() : undefined, endDate: endDate ? new Date(`${endDate}T23:59:59.999`).toISOString() : undefined })
@@ -49,6 +50,7 @@ export default function BlacklistPage() {
 
   const remove = async (phoneNo: string) => {
     await apiClient.blacklist.remove({ phoneNo });
+    setConfirmEntry(null);
     load();
   };
 
@@ -145,7 +147,7 @@ export default function BlacklistPage() {
                 <Table.Td>
                   <Group gap={6} wrap="nowrap">
                     <Button size="xs" variant="light" onClick={() => setEditEntry(row)}>Edit</Button>
-                    <Button size="xs" variant="light" color="red" onClick={() => remove(row.phoneNo)}>Remove</Button>
+                    <Button size="xs" variant="light" color="red" onClick={() => setConfirmEntry(row)}>Remove</Button>
                   </Group>
                 </Table.Td>
               </Table.Tr>
@@ -168,7 +170,7 @@ export default function BlacklistPage() {
               <Text size="xs" c="dimmed" mb="xs">Added: {row.systemDateTime ? new Date(row.systemDateTime).toLocaleDateString() : '—'}</Text>
               <Group justify="flex-end" gap={6} mt="xs">
                 <Button size="xs" variant="light" onClick={() => setEditEntry(row)}>Edit</Button>
-                <Button size="xs" variant="light" color="red" onClick={() => remove(row.phoneNo)}>Remove</Button>
+                <Button size="xs" variant="light" color="red" onClick={() => setConfirmEntry(row)}>Remove</Button>
               </Group>
             </Card>
           ))}
@@ -181,6 +183,23 @@ export default function BlacklistPage() {
           <Pagination total={totalPages} value={page} onChange={setPage} withEdges />
         </Group>
       )}
+
+      <Modal
+        opened={confirmEntry !== null}
+        onClose={() => setConfirmEntry(null)}
+        title="Remove from Blocklist"
+        size="sm"
+        centered
+      >
+        <Text size="sm" mb="lg">
+          Remove <Text span fw={600}>{confirmEntry?.phoneNo}</Text>
+          {confirmEntry?.name ? <> ({confirmEntry.name})</> : ''} from the blocklist?
+        </Text>
+        <Group justify="flex-end" gap="sm">
+          <Button variant="default" onClick={() => setConfirmEntry(null)}>Cancel</Button>
+          <Button color="red" onClick={() => confirmEntry && remove(confirmEntry.phoneNo)}>Remove</Button>
+        </Group>
+      </Modal>
 
       <AddToListModal list="blacklist" opened={opened} onClose={close} onSuccess={load} />
       <AddToListModal
