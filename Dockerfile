@@ -1,37 +1,56 @@
-FROM node:22-slim
+# ─── Stage 1: Builder ────────────────────────────────────────────────────────
+# Installs build tools needed for native node modules (serialport), runs
+# npm ci to compile bindings, then builds the Next.js app.
+# Build tools (python3, make, g++) are NOT carried into the final image.
+FROM node:22-slim AS builder
 
-# Install system dependencies
-# - ffmpeg: voicemail MP3 encoding
-# - python3, make, g++: node-gyp for serialport native bindings
-# - libudev-dev: required by serialport on Linux
 RUN apt-get update && apt-get install -y \
-    ffmpeg \
     python3 \
     make \
     g++ \
     libudev-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci --legacy-peer-deps
+
+COPY . .
+RUN npm run build
+
+# ─── Stage 2: Runner ─────────────────────────────────────────────────────────
+# Lean runtime image — only ffmpeg, curl, piper, and compiled app artifacts.
+# No build tools.
+FROM node:22-slim AS runner
+
+# Runtime system dependencies only
+# - ffmpeg: voicemail MP3 encoding and audio filter chain
+# - curl: used during build to download piper (kept slim — no build tools)
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Download piper TTS with all shared libraries and espeak-ng-data
+# Download piper TTS binary in its own layer so it caches independently
+# of both apt packages and app code changes.
 RUN curl -L https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_linux_x86_64.tar.gz \
     | tar -xz -C /opt \
     && ln -s /opt/piper/piper /usr/bin/piper
 
 WORKDIR /app
 
-# Install dependencies first (layer cache)
-COPY package.json package-lock.json ./
-RUN npm ci --legacy-peer-deps
+# Copy compiled artifacts from builder
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/server.ts ./server.ts
+COPY --from=builder /app/lib ./lib
+COPY --from=builder /app/ffmpeg ./ffmpeg
 
-# Copy source and build Next.js
-COPY . .
-RUN npm run build
-
-# Create data directory
 RUN mkdir -p messages
 
 EXPOSE 3000
 
-# Use tsx directly — env vars are injected via Docker/compose, no .env file needed
 CMD ["node_modules/.bin/tsx", "server.ts"]
