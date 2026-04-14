@@ -1,0 +1,33 @@
+# Git
+.git
+.gitignore
+
+# Node
+node_modules
+
+# Next.js build output
+.next
+
+# Platform-specific piper binary and dylibs (downloaded during Docker build)
+piper/
+
+# Large model files (mounted as a volume at runtime)
+piper-models/
+
+# Local data files
+callattendant.db
+callattendant.db-shm
+callattendant.db-wal
+callattendant.db.bak
+callattendant.db.bak0
+data/
+messages/
+logs/
+
+# Dev/local files
+.env
+.env.local
+*.pcm
+
+# OS
+.DS_Store
