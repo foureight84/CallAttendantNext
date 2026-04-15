@@ -227,6 +227,8 @@ Piper is a fast, lightweight C++ TTS engine optimized for low-latency local infe
 1. The Piper binary
 2. At least one voice model (`.onnx` + `.onnx.json`) in the `piper-models/` directory
 
+> **Bare Metal users:** `baremetal_setup.sh` handles steps 1 and 2 automatically — downloading the Piper binary and two default English voice models. See [Install and Build](#install-and-build). Follow the steps below only if you want to download a different voice model.
+
 ### 1. Download Piper Binary
 
 Download the release for your platform from the [rhasspy/piper releases page](https://github.com/rhasspy/piper/releases/tag/2023.11.14-2):
