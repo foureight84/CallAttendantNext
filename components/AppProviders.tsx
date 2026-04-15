@@ -9,6 +9,7 @@ import { Notifications } from '@mantine/notifications';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { CallNotification } from '@/components/CallNotification';
+import { SetupWizard } from '@/components/SetupWizard';
 import { apiClient } from '@/lib/api-client';
 
 const COOKIE_KEY = 'mantine-color-scheme';
@@ -79,17 +80,25 @@ export function AppProviders({ children, colorScheme }: { children: React.ReactN
   const [diagnosticMode, setDiagnosticMode] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [opened, { toggle, close }] = useDisclosure();
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
     apiClient.messages.unread().then(d => setUnreadCount(d.count));
 
+    // Initial settings load: update debug flags and check if wizard should open
+    apiClient.settings.get().then(s => {
+      setDebugConsole(s.debugConsole);
+      setDiagnosticMode(s.diagnosticMode);
+      if (!s.wizardCompleted) setWizardOpen(true);
+    }).catch(() => {});
+
+    // Re-fetch debug/diagnostic flags whenever settings are saved
     const fetchDebugConsole = () =>
       apiClient.settings.get().then(s => {
         setDebugConsole(s.debugConsole);
         setDiagnosticMode(s.diagnosticMode);
       }).catch(() => {});
-    fetchDebugConsole();
     window.addEventListener('settings-saved', fetchDebugConsole);
 
     const evtSource = new EventSource('/api/events');
@@ -123,6 +132,7 @@ export function AppProviders({ children, colorScheme }: { children: React.ReactN
     <MantineProvider colorSchemeManager={colorSchemeManager} defaultColorScheme={colorScheme}>
       <Notifications position="top-right" />
       <CallNotification />
+      <SetupWizard opened={wizardOpen} onClose={() => setWizardOpen(false)} />
       <AppShell
         navbar={{ width: 200, breakpoint: 'sm', collapsed: { mobile: !opened } }}
         header={{ height: { base: 50, sm: 0 } }}

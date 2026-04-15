@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getModem } from '@/lib/modem';
 import { modemLog } from '@/lib/events';
+import { config } from '@/lib/config';
+
+export async function GET() {
+  const modem = getModem();
+  return NextResponse.json({ connected: modem?.isOpen() ?? false, port: config.serialPort });
+}
 
 export async function POST(req: NextRequest) {
   const { command } = await req.json() as { command: string };

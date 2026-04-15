@@ -387,6 +387,7 @@ export interface AppSettings {
   robocallCleanupCron: string;
   dtmfRemovalEnabled: boolean;
   dtmfRemovalKey: string;
+  wizardCompleted: boolean;
 }
 
 export async function getSettings(): Promise<AppSettings> {
@@ -432,6 +433,7 @@ export async function getSettings(): Promise<AppSettings> {
     robocallCleanupCron:     map['robocallCleanupCron']    ?? config.robocallCleanupCron,
     dtmfRemovalEnabled: (map['dtmfRemovalEnabled'] ?? String(config.dtmfRemovalEnabled)) === 'true',
     dtmfRemovalKey:      map['dtmfRemovalKey']    ?? config.dtmfRemovalKey,
+    wizardCompleted:    (map['wizardCompleted']    ?? 'false') === 'true',
   };
 }
 

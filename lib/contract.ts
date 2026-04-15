@@ -75,6 +75,7 @@ export const AppSettingsSchema = z.object({
   robocallCleanupCron:    z.string().refine(val => { try { CronExpressionParser.parse(val); return true; } catch { return false; } }, { message: 'Invalid cron expression' }),
   dtmfRemovalEnabled:     z.boolean(),
   dtmfRemovalKey:         z.string(),
+  wizardCompleted:        z.boolean(),
 });
 
 const OkSchema = z.object({ ok: z.literal(true) });
