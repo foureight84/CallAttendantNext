@@ -425,8 +425,10 @@ After=network.target
 
 [Service]
 Type=simple
-User=pi                                        # Set to the user that should run the app; remove to run as root (not recommended)
-WorkingDirectory=/home/pi/callattendantnext    # Change to your actual path
+# Set to the user that should run the app; remove this line to run as root (not recommended)
+User=pi
+# Change to your actual path
+WorkingDirectory=/home/pi/callattendantnext
 ExecStart=/usr/bin/npm start
 Restart=on-failure
 RestartSec=5
