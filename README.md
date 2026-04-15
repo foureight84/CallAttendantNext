@@ -38,6 +38,9 @@ If you have a hardware modem not on this list and would like support added, open
     - [pm2](#pm2)
     - [supervisord](#supervisord)
     - [OpenRC](#openrc)
+- [Updating](#updating)
+  - [Docker Update](#docker-update)
+  - [Bare Metal Update](#bare-metal-update)
 - [Migrating from the Python callattendant](#migrating-from-the-python-callattendant)
   - [Bare Metal Migration](#bare-metal-migration)
   - [Docker Migration](#docker-migration)
@@ -603,6 +606,89 @@ sudo rc-service callattendant start
 > **Note:** This feature has not been tested.
 
 Set `ENABLE_GPIO=true` in `.env` to enable LED indicators on GPIO pins (requires the `onoff` package and appropriate wiring). See `lib/modem/gpio.ts` for pin assignments.
+
+---
+
+## Updating
+
+### Docker Update
+
+**Stop the container:**
+
+```bash
+docker compose down
+```
+
+**Pull the latest code or a specific release:**
+
+```bash
+# Latest from main
+git pull origin main
+
+# Or a specific version tag
+git fetch --tags
+git checkout v0.7.0
+```
+
+**Rebuild and restart:**
+
+```bash
+docker compose up -d --build
+```
+
+---
+
+### Bare Metal Update
+
+**Stop the running process:**
+
+```bash
+# systemd
+sudo systemctl stop callattendant
+
+# pm2
+pm2 stop callattendant
+
+# supervisord
+sudo supervisorctl stop callattendant
+
+# OpenRC
+sudo rc-service callattendant stop
+```
+
+**Pull the latest code or a specific release:**
+
+```bash
+# Latest from main
+git pull origin main
+
+# Or a specific version tag
+git fetch --tags
+git checkout v0.7.0
+```
+
+**Reinstall dependencies and rebuild:**
+
+```bash
+npm install --legacy-peer-deps
+npm run build
+```
+
+**Restart the process:**
+
+```bash
+# systemd
+sudo systemctl start callattendant
+
+# pm2
+pm2 start callattendant
+
+# supervisord
+sudo supervisorctl start callattendant
+
+# OpenRC
+sudo rc-service callattendant start
+```
 
 ---
 
