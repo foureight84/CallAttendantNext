@@ -30,9 +30,18 @@ If you have a hardware modem not on this list and would like support added, open
   - [Environment Variables](#environment-variables)
   - [Piper TTS Setup](#piper-tts-setup)
 - [Voicemail Audio Enhancement (RNNoise)](#voicemail-audio-enhancement-rnnoise)
+- [Deployment Options](#deployment-options)
 - [Docker](#docker)
 - [Bare Metal (Raspberry Pi / Linux)](#bare-metal-raspberry-pi--linux)
+  - [Run as a Service](#run-as-a-service)
+    - [systemd](#systemd)
+    - [pm2](#pm2)
+    - [supervisord](#supervisord)
+    - [OpenRC](#openrc)
 - [Migrating from the Python callattendant](#migrating-from-the-python-callattendant)
+  - [Bare Metal Migration](#bare-metal-migration)
+  - [Docker Migration](#docker-migration)
+  - [Migration Options](#migration-options)
 - [Greeting Scripts](#greeting-scripts)
 - [SMTP Email Notifications](#smtp-email-notifications-1)
 - [MQTT Notifications](#mqtt-notifications-1)
@@ -79,7 +88,16 @@ If you have a hardware modem not on this list and would like support added, open
 
 ## Configuration (`.env`)
 
-Copy `.env.example` to `.env` and set your values:
+Create a `.env` file at the project root with at minimum the four required keys:
+
+```bash
+SERIAL_PORT=/dev/ttyUSB0
+SERIAL_BAUD_RATE=115200
+PIPER_BINARY=./piper/piper
+PIPER_MODELS_DIR=./piper-models
+```
+
+You can also copy `.env.example` as a starting point for all available options:
 
 ```bash
 cp .env.example .env
@@ -209,6 +227,8 @@ Piper is a fast, lightweight C++ TTS engine optimized for low-latency local infe
 1. The Piper binary
 2. At least one voice model (`.onnx` + `.onnx.json`) in the `piper-models/` directory
 
+> **Bare Metal users:** `setup.sh` handles steps 1 and 2 automatically — downloading the Piper binary and two default English voice models. See [Install and Build](#install-and-build). Follow the steps below only if you want to download a different voice model.
+
 ### 1. Download Piper Binary
 
 Download the release for your platform from the [rhasspy/piper releases page](https://github.com/rhasspy/piper/releases/tag/2023.11.14-2):
@@ -289,6 +309,17 @@ RNNoise is lightweight by design (~40 MFLOPS). It processes audio approximately 
 
 ---
 
+## Deployment Options
+
+Choose your preferred deployment method:
+
+| Method | Best for |
+|--------|----------|
+| [Docker](#docker) | Most users — no Node.js install needed, isolated environment, easy updates |
+| [Bare Metal](#bare-metal-raspberry-pi--linux) | Raspberry Pi users who prefer direct control, or environments where Docker isn't available |
+
+---
+
 ## Docker
 
 ### Build and Run
@@ -297,12 +328,12 @@ RNNoise is lightweight by design (~40 MFLOPS). It processes audio approximately 
 # Copy and edit your .env
 cp .env.example .env
 
-# Create directories for persistent data
-mkdir -p data messages logs
+# Create required directories and download default voice models
+# (safe to re-run — skips anything that already exists)
+bash setup.sh
 
-# Place your .onnx models in ./piper-models/
-mkdir -p piper-models
-# (download models as shown above)
+# Or create directories manually
+mkdir -p data messages logs piper-models
 
 # Start
 docker compose up -d
@@ -347,10 +378,72 @@ sudo usermod -aG dialout $USER
 ```bash
 git clone https://github.com/foureight84/CallAttendantNext callattendantnext
 cd callattendantnext
+```
 
-npm install
+Choose a setup path:
+
+---
+
+#### Option A — Automated setup (recommended)
+
+Run the included script to create required directories, download the Piper binary for your platform, and download two default English voice models in one step. Docker users can also run this script to create the host directories required by `docker-compose.yml` — the Piper binary download is skipped if it already exists:
+
+```bash
+bash setup.sh
+```
+
+The script is safe to re-run — it skips anything that already exists. To use a different voice model, see [Piper TTS Setup](#piper-tts-setup).
+
+Then install dependencies and build:
+
+```bash
+npm install --legacy-peer-deps
 npm run build
 ```
+
+> **Remember:** Update `SERIAL_PORT` in your `.env` to match your modem's device path (e.g. `/dev/ttyUSB0`). See [Configure](#configure) below.
+
+---
+
+#### Option B — Manual setup
+
+Create the required directories:
+
+```bash
+mkdir -p messages logs piper piper-models
+```
+
+Download and extract the Piper binary for your platform:
+
+```bash
+# Linux arm64 (Raspberry Pi 4/5)
+curl -L https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_linux_aarch64.tar.gz \
+  | tar -xz --strip-components=1 -C piper
+
+# Linux x86_64
+curl -L https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_linux_x86_64.tar.gz \
+  | tar -xz --strip-components=1 -C piper
+```
+
+Download a voice model — see [Piper TTS Setup](#piper-tts-setup) for all available models:
+
+```bash
+wget -P piper-models https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/hfc_female/medium/en_US-hfc_female-medium.onnx
+wget -P piper-models https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/hfc_female/medium/en_US-hfc_female-medium.onnx.json
+```
+
+Install dependencies and build:
+
+```bash
+npm install --legacy-peer-deps
+npm run build
+```
+
+> **Note:** `--legacy-peer-deps` is required due to a peer dependency conflict between `zod` v4 and `@ts-rest/core` which currently expects `zod` v3. This is safe to use — the app is tested and working with `zod` v4.
+
+> **Remember:** Update `SERIAL_PORT` in your `.env` to match your modem's device path (e.g. `/dev/ttyUSB0`). See [Configure](#configure) below.
+
+---
 
 ### Configure
 
@@ -358,12 +451,7 @@ npm run build
 cp .env.example .env
 # Edit .env — set SERIAL_PORT and SERIAL_BAUD_RATE at minimum
 nano .env
-
-# Create directories for persistent data
-mkdir -p data messages logs
 ```
-
-Download Piper and models as described in the [Piper TTS Setup](#piper-tts-setup) section above.
 
 ### Run
 
@@ -373,7 +461,18 @@ npm start
 
 The app will be available at `http://localhost:3000` (or the port set via `PORT` in `.env`).
 
-### Run as a systemd Service
+### Run as a Service
+
+Choose a startup method to keep Call Attendant running in the background and restart automatically after a reboot or crash:
+
+- [systemd](#systemd) — standard on Raspberry Pi OS, Debian, Ubuntu
+- [pm2](#pm2) — Node.js process manager, easiest setup
+- [supervisord](#supervisord) — general-purpose process supervisor
+- [OpenRC](#openrc) — standard on Alpine Linux
+
+---
+
+#### systemd
 
 ```bash
 sudo nano /etc/systemd/system/callattendant.service
@@ -386,7 +485,9 @@ After=network.target
 
 [Service]
 Type=simple
+# Set to the user that should run the app; remove this line to run as root (not recommended)
 User=pi
+# Change to your actual path
 WorkingDirectory=/home/pi/callattendantnext
 ExecStart=/usr/bin/npm start
 Restart=on-failure
@@ -396,10 +497,97 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
+> `npm start` is equivalent to `npm run start` — both invoke the `start` script in `package.json`.
+
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable callattendant
 sudo systemctl start callattendant
+```
+
+---
+
+#### pm2
+
+pm2 is a Node.js process manager with built-in log management, auto-restart, and startup script generation.
+
+```bash
+# Install pm2 globally
+sudo npm install -g pm2
+
+# Start the app
+pm2 start node_modules/.bin/tsx --name callattendant -- server.ts
+
+# Save the process list and generate startup script
+pm2 save
+pm2 startup
+# Run the command output by pm2 startup (it will look like: sudo env PATH=... pm2 startup ...)
+```
+
+**Useful pm2 commands:**
+```bash
+pm2 status                      # Show running processes
+pm2 logs callattendant          # Tail logs
+pm2 restart callattendant
+pm2 stop callattendant
+```
+
+---
+
+#### supervisord
+
+```bash
+sudo apt install -y supervisor
+sudo nano /etc/supervisor/conf.d/callattendant.conf
+```
+
+```ini
+[program:callattendant]
+command=node_modules/.bin/tsx server.ts
+directory=/home/pi/callattendantnext   ; Change to your actual path
+user=pi                                ; Change to your username
+autostart=true
+autorestart=true
+stderr_logfile=/var/log/callattendant.err.log
+stdout_logfile=/var/log/callattendant.out.log
+environment=NODE_ENV="production"
+```
+
+```bash
+sudo supervisorctl reread
+sudo supervisorctl update
+sudo supervisorctl start callattendant
+```
+
+---
+
+#### OpenRC
+
+```bash
+sudo nano /etc/init.d/callattendant
+```
+
+```sh
+#!/sbin/openrc-run
+
+name="callattendant"
+description="Call Attendant Next"
+directory="/home/pi/callattendantnext"   # Change to your actual path
+command="node_modules/.bin/tsx"
+command_args="server.ts"
+command_user="pi"                        # Change to your username
+pidfile="/run/${RC_SVCNAME}.pid"
+command_background=true
+
+depend() {
+    need net
+}
+```
+
+```bash
+sudo chmod +x /etc/init.d/callattendant
+sudo rc-update add callattendant default
+sudo rc-service callattendant start
 ```
 
 ### Raspberry Pi GPIO LEDs (Optional)
@@ -416,16 +604,35 @@ If you have an existing [callattendant](https://github.com/emxsys/callattendant)
 
 The schema is identical between both apps — migration is a direct copy. Voicemail WAV files are copied as-is and served without conversion.
 
-### 1. Stop the new app (if running)
+> **Note:** Settings are not migrated. The Python app has no Settings table; the new app seeds settings from your `.env` on first startup.
+
+Choose your setup:
+- [Bare Metal](#bare-metal-migration) — running directly with Node.js
+- [Docker](#docker-migration) — running with Docker Compose
+
+---
+
+### Bare Metal Migration
+
+#### 1. Stop the new app (if running)
 
 ```bash
 # systemd
 sudo systemctl stop callattendant
 
+# pm2
+pm2 stop callattendant
+
+# supervisord
+sudo supervisorctl stop callattendant
+
+# OpenRC
+sudo rc-service callattendant stop
+
 # or just Ctrl-C if running in the foreground
 ```
 
-### 2. Dry run — verify counts before committing
+#### 2. Dry run — verify counts before committing
 
 ```bash
 npx tsx scripts/migrate-from-python.ts \
@@ -436,7 +643,7 @@ npx tsx scripts/migrate-from-python.ts \
 
 Check that the row counts look correct before proceeding.
 
-### 3. Run the migration
+#### 3. Run the migration
 
 ```bash
 npx tsx scripts/migrate-from-python.ts \
@@ -455,39 +662,40 @@ Files     : 38 copied, 0 already present
 Done.
 ```
 
-### 4. Start the new app
+#### 4. Start the new app
 
 ```bash
+# systemd
+sudo systemctl start callattendant
+
+# pm2
+pm2 start callattendant
+
+# supervisord
+sudo supervisorctl start callattendant
+
+# OpenRC
+sudo rc-service callattendant start
+
+# or run directly in the foreground
 npm start
 ```
 
 All historical call log entries, whitelist/blocklist entries, and voicemail recordings will be present.
 
-### Options
+---
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--old-db` | *(required)* | Path to the Python app's `callattendant.db` |
-| `--old-messages` | *(optional)* | Path to the Python app's `messages/` directory |
-| `--new-db` | `./callattendant.db` | Path to the new app's database (Docker: `./data/callattendant.db`) |
-| `--new-messages` | `./messages` | Path to the new app's messages directory |
-| `--dry-run` | — | Read and count everything; write nothing |
-
-The script is safe to re-run — it uses `INSERT OR IGNORE` for all rows and skips files that already exist in the destination.
-
-> **Note:** Settings are not migrated. The Python app has no Settings table; the new app seeds settings from your `.env` on first startup.
-
-### Running the migration when both apps are in Docker
+### Docker Migration
 
 The new app's database and messages directory are bind-mounted to the host (`./data/` and `./messages/` next to `docker-compose.yml`), so the migration script can reach them directly.
 
-**Step 1 — Stop the new app**
+#### 1. Stop the new app
 
 ```bash
 docker compose down
 ```
 
-**Step 2 — Get the old database and messages onto the host**
+#### 2. Get the old database and messages onto the host
 
 If the old Python callattendant also uses bind mounts, the files are already on the host — note their paths and skip to step 3.
 
@@ -506,7 +714,7 @@ docker cp <old-container>:/app/messages /tmp/old-messages
 
 Adjust `/app/callattendant.db` and `/app/messages` to match the actual paths inside the old container if they differ.
 
-**Step 3 — Run the migration inside a one-off container**
+#### 3. Run the migration inside a one-off container
 
 Use the already-built callattendantnext image so Node.js and all dependencies are available — no need to install anything on the host:
 
@@ -545,7 +753,7 @@ The image name (`callattendantnext-callattendant`) is the default Docker Compose
 
 If the old app's files are already bind-mounted on the host (e.g. at `./old-messages`), pass the host paths directly — no `docker cp` step needed.
 
-**Step 4 — Start the new app**
+#### 4. Start the new app
 
 ```bash
 docker compose up -d
@@ -553,9 +761,25 @@ docker compose up -d
 
 ---
 
+### Migration Options
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--old-db` | *(required)* | Path to the Python app's `callattendant.db` |
+| `--old-messages` | *(optional)* | Path to the Python app's `messages/` directory |
+| `--new-db` | `./callattendant.db` | Path to the new app's database (Docker: `./data/callattendant.db`) |
+| `--new-messages` | `./messages` | Path to the new app's messages directory |
+| `--dry-run` | — | Read and count everything; write nothing |
+
+The script is safe to re-run — it uses `INSERT OR IGNORE` for all rows and skips files that already exist in the destination.
+
+---
+
 ## Greeting Scripts
 
 Greeting text files live in `public/audio/script/`. Edit them to customize what is spoken. **Do not rename these files** — the filenames are hardcoded and the application will not find them if changed.
+
+Scripts are read from disk on every call — **no restart is required** after editing.
 
 | File | When used |
 |------|-----------|
@@ -565,6 +789,41 @@ Greeting text files live in `public/audio/script/`. Edit them to customize what 
 | `goodbye.txt` | Played when ending an interaction |
 | `invalid_response.txt` | Played when an unrecognized input is received |
 | `voice_mail_menu.txt` | Played to present the voicemail menu options |
+
+### Bare Metal
+
+Edit the files directly in the project root:
+
+```bash
+nano public/audio/script/general_greeting.txt
+```
+
+Changes take effect on the next call — no restart needed.
+
+### Docker
+
+The script files are baked into the image by default. To make them editable without rebuilding, mount a local directory over the container's script path.
+
+**Step 1 — Copy the default scripts out of the container:**
+
+```bash
+docker cp $(docker compose ps -q callattendant):/app/public/audio/script ./greeting-scripts
+```
+
+**Step 2 — Add the volume mount to `docker-compose.yml`:**
+
+```yaml
+volumes:
+  - ./greeting-scripts:/app/public/audio/script
+```
+
+**Step 3 — Recreate the container to apply the mount:**
+
+```bash
+docker compose up -d
+```
+
+You can now edit any file in `./greeting-scripts/` and changes will take effect on the next call.
 
 ---
 
