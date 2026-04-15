@@ -30,8 +30,14 @@ If you have a hardware modem not on this list and would like support added, open
   - [Environment Variables](#environment-variables)
   - [Piper TTS Setup](#piper-tts-setup)
 - [Voicemail Audio Enhancement (RNNoise)](#voicemail-audio-enhancement-rnnoise)
+- [Deployment Options](#deployment-options)
 - [Docker](#docker)
 - [Bare Metal (Raspberry Pi / Linux)](#bare-metal-raspberry-pi--linux)
+  - [Run as a Service](#run-as-a-service)
+    - [systemd](#systemd)
+    - [pm2](#pm2)
+    - [supervisord](#supervisord)
+    - [OpenRC](#openrc)
 - [Migrating from the Python callattendant](#migrating-from-the-python-callattendant)
 - [Greeting Scripts](#greeting-scripts)
 - [SMTP Email Notifications](#smtp-email-notifications-1)
@@ -298,6 +304,17 @@ RNNoise is lightweight by design (~40 MFLOPS). It processes audio approximately 
 
 ---
 
+## Deployment Options
+
+Choose your preferred deployment method:
+
+| Method | Best for |
+|--------|----------|
+| [Docker](#docker) | Most users — no Node.js install needed, isolated environment, easy updates |
+| [Bare Metal](#bare-metal-raspberry-pi--linux) | Raspberry Pi users who prefer direct control, or environments where Docker isn't available |
+
+---
+
 ## Docker
 
 ### Build and Run
@@ -384,7 +401,18 @@ npm start
 
 The app will be available at `http://localhost:3000` (or the port set via `PORT` in `.env`).
 
-### Run as a systemd Service
+### Run as a Service
+
+Choose a startup method to keep Call Attendant running in the background and restart automatically after a reboot or crash:
+
+- [systemd](#systemd) — standard on Raspberry Pi OS, Debian, Ubuntu
+- [pm2](#pm2) — Node.js process manager, easiest setup
+- [supervisord](#supervisord) — general-purpose process supervisor
+- [OpenRC](#openrc) — standard on Alpine Linux
+
+---
+
+#### systemd
 
 ```bash
 sudo nano /etc/systemd/system/callattendant.service
@@ -397,7 +425,9 @@ After=network.target
 
 [Service]
 Type=simple
+# Set to the user that should run the app; remove this line to run as root (not recommended)
 User=pi
+# Change to your actual path
 WorkingDirectory=/home/pi/callattendantnext
 ExecStart=/usr/bin/npm start
 Restart=on-failure
@@ -407,10 +437,97 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
+> `npm start` is equivalent to `npm run start` — both invoke the `start` script in `package.json`.
+
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable callattendant
 sudo systemctl start callattendant
+```
+
+---
+
+#### pm2
+
+pm2 is a Node.js process manager with built-in log management, auto-restart, and startup script generation.
+
+```bash
+# Install pm2 globally
+sudo npm install -g pm2
+
+# Start the app
+pm2 start node_modules/.bin/tsx --name callattendant -- server.ts
+
+# Save the process list and generate startup script
+pm2 save
+pm2 startup
+# Run the command output by pm2 startup (it will look like: sudo env PATH=... pm2 startup ...)
+```
+
+**Useful pm2 commands:**
+```bash
+pm2 status                      # Show running processes
+pm2 logs callattendant          # Tail logs
+pm2 restart callattendant
+pm2 stop callattendant
+```
+
+---
+
+#### supervisord
+
+```bash
+sudo apt install -y supervisor
+sudo nano /etc/supervisor/conf.d/callattendant.conf
+```
+
+```ini
+[program:callattendant]
+command=node_modules/.bin/tsx server.ts
+directory=/home/pi/callattendantnext   ; Change to your actual path
+user=pi                                ; Change to your username
+autostart=true
+autorestart=true
+stderr_logfile=/var/log/callattendant.err.log
+stdout_logfile=/var/log/callattendant.out.log
+environment=NODE_ENV="production"
+```
+
+```bash
+sudo supervisorctl reread
+sudo supervisorctl update
+sudo supervisorctl start callattendant
+```
+
+---
+
+#### OpenRC
+
+```bash
+sudo nano /etc/init.d/callattendant
+```
+
+```sh
+#!/sbin/openrc-run
+
+name="callattendant"
+description="Call Attendant Next"
+directory="/home/pi/callattendantnext"   # Change to your actual path
+command="node_modules/.bin/tsx"
+command_args="server.ts"
+command_user="pi"                        # Change to your username
+pidfile="/run/${RC_SVCNAME}.pid"
+command_background=true
+
+depend() {
+    need net
+}
+```
+
+```bash
+sudo chmod +x /etc/init.d/callattendant
+sudo rc-update add callattendant default
+sudo rc-service callattendant start
 ```
 
 ### Raspberry Pi GPIO LEDs (Optional)
