@@ -39,6 +39,9 @@ If you have a hardware modem not on this list and would like support added, open
     - [supervisord](#supervisord)
     - [OpenRC](#openrc)
 - [Migrating from the Python callattendant](#migrating-from-the-python-callattendant)
+  - [Bare Metal Migration](#bare-metal-migration)
+  - [Docker Migration](#docker-migration)
+  - [Migration Options](#migration-options)
 - [Greeting Scripts](#greeting-scripts)
 - [SMTP Email Notifications](#smtp-email-notifications-1)
 - [MQTT Notifications](#mqtt-notifications-1)
@@ -544,7 +547,17 @@ If you have an existing [callattendant](https://github.com/emxsys/callattendant)
 
 The schema is identical between both apps — migration is a direct copy. Voicemail WAV files are copied as-is and served without conversion.
 
-### 1. Stop the new app (if running)
+> **Note:** Settings are not migrated. The Python app has no Settings table; the new app seeds settings from your `.env` on first startup.
+
+Choose your setup:
+- [Bare Metal](#bare-metal-migration) — running directly with Node.js
+- [Docker](#docker-migration) — running with Docker Compose
+
+---
+
+### Bare Metal Migration
+
+#### 1. Stop the new app (if running)
 
 ```bash
 # systemd
@@ -562,7 +575,7 @@ sudo rc-service callattendant stop
 # or just Ctrl-C if running in the foreground
 ```
 
-### 2. Dry run — verify counts before committing
+#### 2. Dry run — verify counts before committing
 
 ```bash
 npx tsx scripts/migrate-from-python.ts \
@@ -573,7 +586,7 @@ npx tsx scripts/migrate-from-python.ts \
 
 Check that the row counts look correct before proceeding.
 
-### 3. Run the migration
+#### 3. Run the migration
 
 ```bash
 npx tsx scripts/migrate-from-python.ts \
@@ -592,7 +605,7 @@ Files     : 38 copied, 0 already present
 Done.
 ```
 
-### 4. Start the new app
+#### 4. Start the new app
 
 ```bash
 npm start
@@ -600,31 +613,19 @@ npm start
 
 All historical call log entries, whitelist/blocklist entries, and voicemail recordings will be present.
 
-### Options
+---
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--old-db` | *(required)* | Path to the Python app's `callattendant.db` |
-| `--old-messages` | *(optional)* | Path to the Python app's `messages/` directory |
-| `--new-db` | `./callattendant.db` | Path to the new app's database (Docker: `./data/callattendant.db`) |
-| `--new-messages` | `./messages` | Path to the new app's messages directory |
-| `--dry-run` | — | Read and count everything; write nothing |
-
-The script is safe to re-run — it uses `INSERT OR IGNORE` for all rows and skips files that already exist in the destination.
-
-> **Note:** Settings are not migrated. The Python app has no Settings table; the new app seeds settings from your `.env` on first startup.
-
-### Running the migration when both apps are in Docker
+### Docker Migration
 
 The new app's database and messages directory are bind-mounted to the host (`./data/` and `./messages/` next to `docker-compose.yml`), so the migration script can reach them directly.
 
-**Step 1 — Stop the new app**
+#### 1. Stop the new app
 
 ```bash
 docker compose down
 ```
 
-**Step 2 — Get the old database and messages onto the host**
+#### 2. Get the old database and messages onto the host
 
 If the old Python callattendant also uses bind mounts, the files are already on the host — note their paths and skip to step 3.
 
@@ -643,7 +644,7 @@ docker cp <old-container>:/app/messages /tmp/old-messages
 
 Adjust `/app/callattendant.db` and `/app/messages` to match the actual paths inside the old container if they differ.
 
-**Step 3 — Run the migration inside a one-off container**
+#### 3. Run the migration inside a one-off container
 
 Use the already-built callattendantnext image so Node.js and all dependencies are available — no need to install anything on the host:
 
@@ -682,11 +683,25 @@ The image name (`callattendantnext-callattendant`) is the default Docker Compose
 
 If the old app's files are already bind-mounted on the host (e.g. at `./old-messages`), pass the host paths directly — no `docker cp` step needed.
 
-**Step 4 — Start the new app**
+#### 4. Start the new app
 
 ```bash
 docker compose up -d
 ```
+
+---
+
+### Migration Options
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--old-db` | *(required)* | Path to the Python app's `callattendant.db` |
+| `--old-messages` | *(optional)* | Path to the Python app's `messages/` directory |
+| `--new-db` | `./callattendant.db` | Path to the new app's database (Docker: `./data/callattendant.db`) |
+| `--new-messages` | `./messages` | Path to the new app's messages directory |
+| `--dry-run` | — | Read and count everything; write nothing |
+
+The script is safe to re-run — it uses `INSERT OR IGNORE` for all rows and skips files that already exist in the destination.
 
 ---
 
