@@ -727,6 +727,8 @@ The script is safe to re-run — it uses `INSERT OR IGNORE` for all rows and ski
 
 Greeting text files live in `public/audio/script/`. Edit them to customize what is spoken. **Do not rename these files** — the filenames are hardcoded and the application will not find them if changed.
 
+Scripts are read from disk on every call — **no restart is required** after editing.
+
 | File | When used |
 |------|-----------|
 | `general_greeting.txt` | Played when a call is answered and sent to voicemail |
@@ -735,6 +737,41 @@ Greeting text files live in `public/audio/script/`. Edit them to customize what 
 | `goodbye.txt` | Played when ending an interaction |
 | `invalid_response.txt` | Played when an unrecognized input is received |
 | `voice_mail_menu.txt` | Played to present the voicemail menu options |
+
+### Bare Metal
+
+Edit the files directly in the project root:
+
+```bash
+nano public/audio/script/general_greeting.txt
+```
+
+Changes take effect on the next call — no restart needed.
+
+### Docker
+
+The script files are baked into the image by default. To make them editable without rebuilding, mount a local directory over the container's script path.
+
+**Step 1 — Copy the default scripts out of the container:**
+
+```bash
+docker cp $(docker compose ps -q callattendant):/app/public/audio/script ./greeting-scripts
+```
+
+**Step 2 — Add the volume mount to `docker-compose.yml`:**
+
+```yaml
+volumes:
+  - ./greeting-scripts:/app/public/audio/script
+```
+
+**Step 3 — Recreate the container to apply the mount:**
+
+```bash
+docker compose up -d
+```
+
+You can now edit any file in `./greeting-scripts/` and changes will take effect on the next call.
 
 ---
 
