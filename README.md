@@ -613,6 +613,19 @@ Done.
 #### 4. Start the new app
 
 ```bash
+# systemd
+sudo systemctl start callattendant
+
+# pm2
+pm2 start callattendant
+
+# supervisord
+sudo supervisorctl start callattendant
+
+# OpenRC
+sudo rc-service callattendant start
+
+# or run directly in the foreground
 npm start
 ```
 
