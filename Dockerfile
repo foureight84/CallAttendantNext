@@ -34,7 +34,15 @@ RUN apt-get update && apt-get install -y \
 
 # Download piper TTS binary in its own layer so it caches independently
 # of both apt packages and app code changes.
-RUN curl -L https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_linux_x86_64.tar.gz \
+# TARGETARCH is set automatically by buildx: amd64, arm64, or arm.
+ARG TARGETARCH
+RUN case "$TARGETARCH" in \
+      amd64) PIPER_FILE="piper_linux_x86_64.tar.gz" ;; \
+      arm64) PIPER_FILE="piper_linux_aarch64.tar.gz" ;; \
+      arm)   PIPER_FILE="piper_linux_armv7.tar.gz" ;; \
+      *)     echo "Unsupported architecture: $TARGETARCH" && exit 1 ;; \
+    esac && \
+    curl -L "https://github.com/rhasspy/piper/releases/download/2023.11.14-2/${PIPER_FILE}" \
     | tar -xz -C /opt \
     && ln -s /opt/piper/piper /usr/bin/piper
 
