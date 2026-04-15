@@ -260,7 +260,7 @@ export function SetupWizard({ opened, onClose }: SetupWizardProps) {
                 <Text size="sm">
                   If the modem is plugged in but on a different port, update <code>SERIAL_PORT</code> in
                   your <code>.env</code> file, then click <strong>Restart Modem</strong> below — no full
-                  app restart needed. On Linux you can find your modem with:
+                  Call Attendant restart needed. On Linux you can find your modem with:
                 </Text>
                 <Text size="sm" ff="monospace" c="dimmed" style={{ background: 'var(--mantine-color-default)', padding: '6px 10px', borderRadius: 4 }}>
                   ls /dev/ttyUSB* /dev/ttyACM* 2&gt;/dev/null
@@ -341,7 +341,7 @@ export function SetupWizard({ opened, onClose }: SetupWizardProps) {
         return (
           <Stack gap="md">
             <Text size="sm" c="dimmed">
-              Configure how many rings before the app answers and takes a voicemail.
+              Configure how many rings before Call Attendant answers and takes a voicemail.
             </Text>
             <Alert color="blue" icon={<IconInfoCircle size={16} />}>
               <Stack gap={4}>
@@ -355,7 +355,7 @@ export function SetupWizard({ opened, onClose }: SetupWizardProps) {
                 </Text>
                 <Text size="sm">
                   If your physical phone supports first-ring suppression, setting unknown callers to 1 ring
-                  means the phone won&apos;t ring audibly before the app answers.
+                  means the phone won&apos;t ring audibly before Call Attendant answers.
                 </Text>
               </Stack>
             </Alert>
@@ -705,7 +705,7 @@ export function SetupWizard({ opened, onClose }: SetupWizardProps) {
             </Text>
             <TextInput
               label="Log File Path"
-              description="Relative to the app root."
+              description="Relative to the Call Attendant root directory."
               value={values.logFile}
               onChange={e => set('logFile', e.currentTarget.value)}
             />
