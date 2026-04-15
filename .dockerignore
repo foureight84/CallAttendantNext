@@ -28,7 +28,7 @@ logs/
 .env
 .env.local
 *.pcm
-baremetal_setup.sh
+setup.sh
 
 # OS
 .DS_Store

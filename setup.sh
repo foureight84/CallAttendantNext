@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# baremetal_setup.sh — One-time setup script for Call Attendant Next on bare metal (Raspberry Pi / Linux)
-# Run from the project root: bash baremetal_setup.sh
+# setup.sh — One-time setup script for Call Attendant Next
+# Creates required directories, downloads the Piper TTS binary (bare metal only),
+# and downloads two default English voice models.
+# Run from the project root: bash setup.sh
 
 set -euo pipefail
 
@@ -50,7 +52,7 @@ info "Detected architecture: $ARCH → $PIPER_ARCHIVE"
 
 # ── Create directories ────────────────────────────────────────────────────────
 
-for dir in messages logs piper piper-models; do
+for dir in data messages logs piper piper-models; do
   if [ -d "$dir" ]; then
     skip "Directory '$dir'"
   else
@@ -59,7 +61,9 @@ for dir in messages logs piper piper-models; do
   fi
 done
 
-# ── Download and extract Piper binary ────────────────────────────────────────
+# ── Download and extract Piper binary (bare metal only) ──────────────────────
+# Docker downloads the Piper binary automatically during image build.
+# This step is skipped if the binary already exists.
 
 if [ -f "piper/piper" ]; then
   skip "Piper binary (piper/piper)"

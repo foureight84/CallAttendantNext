@@ -227,7 +227,7 @@ Piper is a fast, lightweight C++ TTS engine optimized for low-latency local infe
 1. The Piper binary
 2. At least one voice model (`.onnx` + `.onnx.json`) in the `piper-models/` directory
 
-> **Bare Metal users:** `baremetal_setup.sh` handles steps 1 and 2 automatically — downloading the Piper binary and two default English voice models. See [Install and Build](#install-and-build). Follow the steps below only if you want to download a different voice model.
+> **Bare Metal users:** `setup.sh` handles steps 1 and 2 automatically — downloading the Piper binary and two default English voice models. See [Install and Build](#install-and-build). Follow the steps below only if you want to download a different voice model.
 
 ### 1. Download Piper Binary
 
@@ -328,12 +328,12 @@ Choose your preferred deployment method:
 # Copy and edit your .env
 cp .env.example .env
 
-# Create directories for persistent data
-mkdir -p data messages logs
+# Create required directories and download default voice models
+# (safe to re-run — skips anything that already exists)
+bash setup.sh
 
-# Place your .onnx models in ./piper-models/
-mkdir -p piper-models
-# (download models as shown above)
+# Or create directories manually
+mkdir -p data messages logs piper-models
 
 # Start
 docker compose up -d
@@ -386,10 +386,10 @@ Choose a setup path:
 
 #### Option A — Automated setup (recommended)
 
-Run the included script to create required directories, download the Piper binary for your platform, and download two default English voice models in one step:
+Run the included script to create required directories, download the Piper binary for your platform, and download two default English voice models in one step. Docker users can also run this script to create the host directories required by `docker-compose.yml` — the Piper binary download is skipped if it already exists:
 
 ```bash
-bash baremetal_setup.sh
+bash setup.sh
 ```
 
 The script is safe to re-run — it skips anything that already exists. To use a different voice model, see [Piper TTS Setup](#piper-tts-setup).
