@@ -550,6 +550,15 @@ The schema is identical between both apps — migration is a direct copy. Voicem
 # systemd
 sudo systemctl stop callattendant
 
+# pm2
+pm2 stop callattendant
+
+# supervisord
+sudo supervisorctl stop callattendant
+
+# OpenRC
+sudo rc-service callattendant stop
+
 # or just Ctrl-C if running in the foreground
 ```
 
