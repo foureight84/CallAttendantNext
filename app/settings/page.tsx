@@ -705,7 +705,15 @@ export default function SettingsPage() {
         </Stack>
       </form>
       <Text size="xs" c="dimmed" ta="center">v{process.env.NEXT_PUBLIC_APP_VERSION}</Text>
-      <SetupWizard opened={wizardOpen} onClose={() => setWizardOpen(false)} />
+      <SetupWizard
+        opened={wizardOpen}
+        onClose={() => {
+          setWizardOpen(false);
+          apiClient.settings.get().then(data =>
+            form.initialize({ ...data, mqttTopicPrefix: data.mqttTopicPrefix || 'callattendant' })
+          );
+        }}
+      />
     </Stack>
   );
 }

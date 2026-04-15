@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import {
   Modal, Stack, Group, Text, Button, Switch, Select,
-  NumberInput, TextInput, PasswordInput, Slider, Radio, Alert, Anchor, Divider, Loader,
+  NumberInput, TextInput, PasswordInput, Slider, Radio, Alert, Anchor, Divider, Loader, Tabs, Code,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconAlertCircle, IconInfoCircle, IconCheck } from '@tabler/icons-react';
@@ -525,6 +525,43 @@ export function SetupWizard({ opened, onClose }: SetupWizardProps) {
             />
             {values.emailEnabled && (
               <Stack gap="sm">
+                <Tabs defaultValue="gmail">
+                  <Tabs.List>
+                    <Tabs.Tab value="gmail">Gmail</Tabs.Tab>
+                    <Tabs.Tab value="outlook">Outlook</Tabs.Tab>
+                    <Tabs.Tab value="icloud">iCloud</Tabs.Tab>
+                    <Tabs.Tab value="custom">Custom SMTP</Tabs.Tab>
+                  </Tabs.List>
+                  <Tabs.Panel value="gmail" pt="xs">
+                    <Stack gap={4}>
+                      <Text size="sm">1. Enable <strong>2-Step Verification</strong> on your Google account.</Text>
+                      <Text size="sm">2. Go to <Anchor href="https://myaccount.google.com/apppasswords" target="_blank" size="sm">myaccount.google.com/apppasswords</Anchor> and create an App Password.</Text>
+                      <Text size="sm">3. Use these settings:</Text>
+                      <Code block>Host: smtp.gmail.com{'\n'}Port: 587{'\n'}User: you@gmail.com{'\n'}Pass: (16-char app password)</Code>
+                    </Stack>
+                  </Tabs.Panel>
+                  <Tabs.Panel value="outlook" pt="xs">
+                    <Stack gap={4}>
+                      <Text size="sm">Works with Outlook.com, Hotmail, and Microsoft 365 accounts.</Text>
+                      <Text size="sm">Use your regular Microsoft account password (or an app password if MFA is enabled).</Text>
+                      <Text size="sm">Settings:</Text>
+                      <Code block>Host: smtp-mail.outlook.com{'\n'}Port: 587{'\n'}User: you@outlook.com{'\n'}Pass: your password</Code>
+                      <Text size="xs" c="dimmed">For Microsoft 365 / work accounts, your admin may need to enable SMTP AUTH.</Text>
+                    </Stack>
+                  </Tabs.Panel>
+                  <Tabs.Panel value="icloud" pt="xs">
+                    <Stack gap={4}>
+                      <Text size="sm">1. Enable <strong>two-factor authentication</strong> on your Apple ID.</Text>
+                      <Text size="sm">2. Go to <Anchor href="https://appleid.apple.com" target="_blank" size="sm">appleid.apple.com</Anchor> → Sign-In and Security → App-Specific Passwords.</Text>
+                      <Text size="sm">3. Generate an app-specific password and use these settings:</Text>
+                      <Code block>Host: smtp.mail.me.com{'\n'}Port: 587{'\n'}User: you@icloud.com{'\n'}Pass: (app-specific password)</Code>
+                    </Stack>
+                  </Tabs.Panel>
+                  <Tabs.Panel value="custom" pt="xs">
+                    <Text size="sm">Enter your mail provider&apos;s SMTP settings below. Port 587 uses STARTTLS; port 465 uses SSL.</Text>
+                  </Tabs.Panel>
+                </Tabs>
+                <Divider />
                 <Group grow align="flex-end">
                   <TextInput
                     label="SMTP Host"

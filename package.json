@@ -45,5 +45,8 @@
     "recharts": "^3.8.0",
     "serialport": "^13.0.0",
     "zod": "^4.3.6"
+  },
+  "optionalDependencies": {
+    "onoff": "^6.0.3"
   }
 }
