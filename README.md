@@ -412,7 +412,7 @@ npm install --legacy-peer-deps
 npm run build
 ```
 
-> **Remember:** Update `SERIAL_PORT` in your `.env` to match your modem's device path (e.g. `/dev/ttyUSB0`). See [Configure](#configure) below.
+> **Remember:** Update `SERIAL_PORT` in your `.env` to match your modem's device path (e.g. `/dev/ttyUSB0`).
 
 ---
 
@@ -452,17 +452,9 @@ npm run build
 
 > **Note:** `--legacy-peer-deps` is required due to a peer dependency conflict between `zod` v4 and `@ts-rest/core` which currently expects `zod` v3. This is safe to use — the app is tested and working with `zod` v4.
 
-> **Remember:** Update `SERIAL_PORT` in your `.env` to match your modem's device path (e.g. `/dev/ttyUSB0`). See [Configure](#configure) below.
+> **Remember:** Update `SERIAL_PORT` in your `.env` to match your modem's device path (e.g. `/dev/ttyUSB0`).
 
 ---
-
-### Configure
-
-```bash
-cp .env.example .env
-# Edit .env — set SERIAL_PORT and SERIAL_BAUD_RATE at minimum
-nano .env
-```
 
 ### Run
 
