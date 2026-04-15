@@ -376,22 +376,68 @@ sudo usermod -aG dialout $USER
 ```bash
 git clone https://github.com/foureight84/CallAttendantNext callattendantnext
 cd callattendantnext
-
-npm install --legacy-peer-deps
-npm run build
 ```
 
-> **Note:** `--legacy-peer-deps` is required due to a peer dependency conflict between `zod` v4 and `@ts-rest/core` which currently expects `zod` v3. This is safe to use — the app is tested and working with `zod` v4.
+Choose a setup path:
 
-### Set Up Directories, Piper, and Voice Models
+---
 
-Run the included setup script to create the required directories, download the Piper binary for your platform, and download two default English voice models:
+#### Option A — Automated setup (recommended)
+
+Run the included script to create required directories, download the Piper binary for your platform, and download two default English voice models in one step:
 
 ```bash
 bash baremetal_setup.sh
 ```
 
 The script is safe to re-run — it skips anything that already exists. To use a different voice model, see [Piper TTS Setup](#piper-tts-setup).
+
+Then install dependencies and build:
+
+```bash
+npm install --legacy-peer-deps
+npm run build
+```
+
+---
+
+#### Option B — Manual setup
+
+Create the required directories:
+
+```bash
+mkdir -p messages logs piper piper-models
+```
+
+Download and extract the Piper binary for your platform:
+
+```bash
+# Linux arm64 (Raspberry Pi 4/5)
+curl -L https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_linux_aarch64.tar.gz \
+  | tar -xz --strip-components=1 -C piper
+
+# Linux x86_64
+curl -L https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_linux_x86_64.tar.gz \
+  | tar -xz --strip-components=1 -C piper
+```
+
+Download a voice model — see [Piper TTS Setup](#piper-tts-setup) for all available models:
+
+```bash
+wget -P piper-models https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/hfc_female/medium/en_US-hfc_female-medium.onnx
+wget -P piper-models https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/hfc_female/medium/en_US-hfc_female-medium.onnx.json
+```
+
+Install dependencies and build:
+
+```bash
+npm install --legacy-peer-deps
+npm run build
+```
+
+> **Note:** `--legacy-peer-deps` is required due to a peer dependency conflict between `zod` v4 and `@ts-rest/core` which currently expects `zod` v3. This is safe to use — the app is tested and working with `zod` v4.
+
+---
 
 ### Configure
 
