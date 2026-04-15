@@ -79,7 +79,16 @@ If you have a hardware modem not on this list and would like support added, open
 
 ## Configuration (`.env`)
 
-Copy `.env.example` to `.env` and set your values:
+Create a `.env` file at the project root with at minimum the four required keys:
+
+```bash
+SERIAL_PORT=/dev/ttyUSB0
+SERIAL_BAUD_RATE=115200
+PIPER_BINARY=./piper/piper
+PIPER_MODELS_DIR=./piper-models
+```
+
+You can also copy `.env.example` as a starting point for all available options:
 
 ```bash
 cp .env.example .env
@@ -348,9 +357,11 @@ sudo usermod -aG dialout $USER
 git clone https://github.com/foureight84/CallAttendantNext callattendantnext
 cd callattendantnext
 
-npm install
+npm install --legacy-peer-deps
 npm run build
 ```
+
+> **Note:** `--legacy-peer-deps` is required due to a peer dependency conflict between `zod` v4 and `@ts-rest/core` which currently expects `zod` v3. This is safe to use — the app is tested and working with `zod` v4.
 
 ### Configure
 
