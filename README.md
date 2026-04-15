@@ -383,18 +383,23 @@ npm run build
 
 > **Note:** `--legacy-peer-deps` is required due to a peer dependency conflict between `zod` v4 and `@ts-rest/core` which currently expects `zod` v3. This is safe to use — the app is tested and working with `zod` v4.
 
+### Set Up Directories, Piper, and Voice Models
+
+Run the included setup script to create the required directories, download the Piper binary for your platform, and download two default English voice models:
+
+```bash
+bash baremetal_setup.sh
+```
+
+The script is safe to re-run — it skips anything that already exists. To use a different voice model, see [Piper TTS Setup](#piper-tts-setup).
+
 ### Configure
 
 ```bash
 cp .env.example .env
 # Edit .env — set SERIAL_PORT and SERIAL_BAUD_RATE at minimum
 nano .env
-
-# Create directories for persistent data
-mkdir -p data messages logs
 ```
-
-Download Piper and models as described in the [Piper TTS Setup](#piper-tts-setup) section above.
 
 ### Run
 
