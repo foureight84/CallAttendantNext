@@ -86,7 +86,18 @@ If you have a hardware modem not on this list and would like support added, open
 
 # Getting Started
 
+## Clone the Repository
+
+```bash
+git clone https://github.com/foureight84/CallAttendantNext callattendantnext
+cd callattendantnext
+```
+
 ## Configuration (`.env`)
+
+> **Docker users: skip this section.** Docker does not use the `.env` file — all configuration is set via the `environment:` block in `docker-compose.yml`. See [Docker](#docker).
+
+On first launch, a **Setup Wizard** will guide you through all the key settings directly in the web UI — you don't need to configure everything in `.env` upfront. The `.env` file is mainly used to set the serial port and paths that the app needs before it can start.
 
 Create a `.env` file at the project root with at minimum the four required keys:
 
@@ -227,7 +238,7 @@ Piper is a fast, lightweight C++ TTS engine optimized for low-latency local infe
 1. The Piper binary
 2. At least one voice model (`.onnx` + `.onnx.json`) in the `piper-models/` directory
 
-> **Bare Metal users:** `setup.sh` handles steps 1 and 2 automatically — downloading the Piper binary and two default English voice models. See [Install and Build](#install-and-build). Follow the steps below only if you want to download a different voice model.
+> **`setup.sh` handles both steps automatically** — it downloads the Piper binary for your platform and two default English voice models (`en_US-hfc_female-medium` and `en_US-hfc_male-medium`). Follow the steps below only if you want to download additional or different voice models. See [Deployment Options](#deployment-options) for how to run `setup.sh` for your setup.
 
 ### 1. Download Piper Binary
 
@@ -325,9 +336,6 @@ Choose your preferred deployment method:
 ### Build and Run
 
 ```bash
-# Copy and edit your .env
-cp .env.example .env
-
 # Create required directories and download default voice models
 # (safe to re-run — skips anything that already exists)
 bash setup.sh
@@ -344,7 +352,12 @@ The app will be available at `http://localhost:3000`.
 ### Notes
 
 - The Dockerfile downloads the piper binary automatically during build
-- Mount your modem device via `devices` in `docker-compose.yml` (already configured for `/dev/ttyUSB0`). If your modem is on a different path, update both the `devices` entry and the `SERIAL_PORT` environment variable in `docker-compose.yml`
+- Mount your modem device via `devices` in `docker-compose.yml`. The format is `host_path:container_path`. If your modem is on `/dev/ttyUSB0` the default config already handles it:
+  ```yaml
+  devices:
+    - /dev/ttyUSB0:/dev/ttyUSB0
+  ```
+  `SERIAL_PORT` must match the **container-side** path. For example, if you mount `/dev/ttyUSB0` on the host to `/dev/ttyUSB1` inside the container, set `SERIAL_PORT=/dev/ttyUSB1` in `docker-compose.yml`
 - `data/`, `messages/`, and `logs/` must exist before first run — Docker will create them automatically on start but as root-owned, which can cause permission issues
 - Pass all config via environment variables in `docker-compose.yml` — no `.env` file is loaded inside the container
 
@@ -374,11 +387,6 @@ sudo usermod -aG dialout $USER
 ```
 
 ### Install and Build
-
-```bash
-git clone https://github.com/foureight84/CallAttendantNext callattendantnext
-cd callattendantnext
-```
 
 Choose a setup path:
 

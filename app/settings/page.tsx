@@ -8,6 +8,7 @@ import { useForm } from '@mantine/form';
 import { CronExpressionParser } from 'cron-parser';
 import { apiClient } from '@/lib/api-client';
 import type { AppSettings } from '@/lib/contract';
+import { SetupWizard } from '@/components/SetupWizard';
 
 function parseCronFields(expr: string): [string, string, string, string, string] {
   const parts = expr.trim().split(/\s+/);
@@ -38,6 +39,7 @@ export default function SettingsPage() {
   const [cleanupRunning, setCleanupRunning] = useState(false);
   const [cleanupPendingCount, setCleanupPendingCount] = useState(0);
   const cleanupPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   const form = useForm<AppSettings>({
     initialValues: {
@@ -82,6 +84,7 @@ export default function SettingsPage() {
       robocallCleanupCron: '0 2 * * 6',
       dtmfRemovalEnabled: false,
       dtmfRemovalKey: '9',
+      wizardCompleted: false,
     },
   });
 
@@ -198,7 +201,10 @@ export default function SettingsPage() {
             }}
           >
             <Title order={2}>Settings</Title>
-            <Button type="submit" disabled={!form.isDirty()}>Save Settings</Button>
+            <Group gap="sm">
+              <Button variant="default" onClick={() => setWizardOpen(true)}>Setup Wizard</Button>
+              <Button type="submit" disabled={!form.isDirty()}>Save Settings</Button>
+            </Group>
           </Box>
 
           <Card shadow="sm" padding="lg" radius="md" withBorder>
@@ -699,6 +705,7 @@ export default function SettingsPage() {
         </Stack>
       </form>
       <Text size="xs" c="dimmed" ta="center">v{process.env.NEXT_PUBLIC_APP_VERSION}</Text>
+      <SetupWizard opened={wizardOpen} onClose={() => setWizardOpen(false)} />
     </Stack>
   );
 }
