@@ -95,6 +95,7 @@ const defaultSettings: AppSettings = {
   robocallCleanupCron: '0 2 * * 6',
   dtmfRemovalEnabled: false,
   dtmfRemovalKey: '9',
+  wizardCompleted: true,
 };
 
 const ALICE_INFO = { name: 'Alice', number: '5551234567', date: '0403', time: '1430' };

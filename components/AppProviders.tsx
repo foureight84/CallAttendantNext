@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { MantineProvider, AppShell, NavLink, Group, Text, Badge, ActionIcon, Tooltip, useMantineColorScheme, Burger } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import type { MantineColorSchemeManager, MantineColorScheme } from '@mantine/core';
-import { IconPhone, IconLayoutDashboard, IconPhoneCall, IconRecordMail, IconAddressBook, IconBan, IconSettings, IconBug, IconSun, IconMoon, IconDeviceDesktop, IconStethoscope } from '@tabler/icons-react';
+import { IconPhone, IconLayoutDashboard, IconPhoneCall, IconRecordMail, IconAddressBook, IconBan, IconSettings, IconBug, IconSun, IconMoon, IconDeviceDesktop, IconStethoscope, IconInfoCircle } from '@tabler/icons-react';
 import { Notifications } from '@mantine/notifications';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
@@ -81,7 +81,6 @@ export function AppProviders({ children, colorScheme }: { children: React.ReactN
   const [mounted, setMounted] = useState(false);
   const [opened, { toggle, close }] = useDisclosure();
   const [wizardOpen, setWizardOpen] = useState(false);
-
   useEffect(() => {
     setMounted(true);
     apiClient.messages.unread().then(d => setUnreadCount(d.count));
@@ -120,10 +119,11 @@ export function AppProviders({ children, colorScheme }: { children: React.ReactN
   const navItems = [
     { href: '/',          label: 'Dashboard',    icon: IconLayoutDashboard },
     { href: '/calls',     label: 'Call Log',     icon: IconPhoneCall },
-    { href: '/messages',  label: 'Voicemails',   icon: IconRecordMail, badge: unreadCount || undefined },
+    { href: '/messages',  label: 'Voicemails',   icon: IconRecordMail, badge: unreadCount || undefined, badgeColor: 'blue' as const },
     { href: '/whitelist', label: 'Phonebook',    icon: IconAddressBook },
     { href: '/blacklist', label: 'Blocklist',    icon: IconBan },
-    { href: '/settings',    label: 'Settings',      icon: IconSettings },
+    { href: '/settings',  label: 'Settings',     icon: IconSettings },
+    { href: '/about',     label: 'About',        icon: IconInfoCircle },
     ...(debugConsole ? [{ href: '/debug', label: 'Debug Console', icon: IconBug }] : []),
     ...(diagnosticMode ? [{ href: '/diagnostic', label: 'Diagnostics', icon: IconStethoscope }] : []),
   ];
@@ -161,8 +161,10 @@ export function AppProviders({ children, colorScheme }: { children: React.ReactN
                 active={pathname === item.href}
                 leftSection={mounted ? <item.icon size={18} stroke={1.5} /> : undefined}
                 rightSection={
-                  item.badge ? (
-                    <Badge size="sm" color="blue">{item.badge > 999 ? '999+' : item.badge}</Badge>
+                  item.badge !== undefined ? (
+                    <Badge size="sm" color={item.badgeColor ?? 'blue'}>
+                      {typeof item.badge === 'number' && item.badge > 999 ? '999+' : item.badge}
+                    </Badge>
                   ) : undefined
                 }
                 onClick={close}
