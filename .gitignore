@@ -34,6 +34,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # Next.js
 .next/
+next-env.d.ts
 
 # App data
 *.db

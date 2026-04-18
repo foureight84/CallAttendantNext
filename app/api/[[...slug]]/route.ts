@@ -16,6 +16,15 @@ function json<T>(data: T, status = 200) {
   return NextResponse.json(data, { status });
 }
 
+function isNewerVersion(latest: string, current: string): boolean {
+  const parse = (v: string) => v.replace(/^v/, '').split('.').map(Number);
+  const [lMaj = 0, lMin = 0, lPat = 0] = parse(latest);
+  const [cMaj = 0, cMin = 0, cPat = 0] = parse(current);
+  if (lMaj !== cMaj) return lMaj > cMaj;
+  if (lMin !== cMin) return lMin > cMin;
+  return lPat > cPat;
+}
+
 export async function GET(req: NextRequest, { params }: { params: Promise<{ slug?: string[] }> }) {
   const { slug } = await params;
   const route = slug?.join('/') ?? '';
@@ -98,6 +107,27 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   if (route === 'settings') {
     const s = await getSettings();
     return json({ serialPort: config.serialPort, serialBaudRate: config.serialBaudRate, ...s });
+  }
+
+  if (route === 'version/check') {
+    type VersionCache = { tag: string; ts: number };
+    const g = globalThis as { __versionCache?: VersionCache };
+    const now = Date.now();
+    const current = process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0';
+    if (!g.__versionCache || now - g.__versionCache.ts > 3_600_000) {
+      try {
+        const res = await fetch('https://api.github.com/repos/foureight84/CallAttendantNext/releases/latest', {
+          headers: { 'User-Agent': 'CallAttendantNext' },
+        });
+        const data = await res.json() as { tag_name?: string };
+        if (data.tag_name) g.__versionCache = { tag: data.tag_name, ts: now };
+      } catch {
+        return json({ current, latest: null, hasUpdate: false });
+      }
+    }
+    if (!g.__versionCache) return json({ current, latest: null, hasUpdate: false });
+    const latest = g.__versionCache.tag.replace(/^v/, '');
+    return json({ current, latest, hasUpdate: isNewerVersion(latest, current) });
   }
 
   if (route === 'piper/models') {

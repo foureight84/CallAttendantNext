@@ -49,6 +49,7 @@ function makeSettings(overrides: Partial<AppSettings> = {}): AppSettings {
     robocallCleanupCron: '0 2 * * 6',
     dtmfRemovalEnabled: false,
     dtmfRemovalKey: '9',
+    wizardCompleted: true,
     ...overrides,
   };
 }

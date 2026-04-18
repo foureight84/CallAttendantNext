@@ -3,9 +3,9 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useState, useRef } from 'react';
-import { Card, Text, Title, Table, Badge, Stack, Tabs, UnstyledButton, SimpleGrid, Box, Group } from '@mantine/core';
+import { Card, Text, Title, Table, Badge, Stack, Tabs, UnstyledButton, SimpleGrid, Box, Group, Alert, Anchor, CloseButton } from '@mantine/core';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
-import { IconRecordMail } from '@tabler/icons-react';
+import { IconRecordMail, IconInfoCircle } from '@tabler/icons-react';
 import { apiClient } from '@/lib/api-client';
 import { VoicemailModal } from '@/components/VoicemailModal';
 import type { CallLog, ListEntry, Message } from '@/lib/contract';
@@ -92,6 +92,7 @@ export default function DashboardPage() {
   const [monthlyTrend, setMonthlyTrend] = useState<TrendRow[]>([]);
   const [topCallers, setTopCallers]     = useState<TopCaller[]>([]);
   const [topBlocked, setTopBlocked]     = useState<TopCaller[]>([]);
+  const [updateBanner, setUpdateBanner] = useState<{ latest: string } | null>(null);
 
   useEffect(() => {
     const rafId = requestAnimationFrame(() => setMounted(true));
@@ -135,6 +136,13 @@ export default function DashboardPage() {
       setBlacklist(new Map(bl.rows.map((e: ListEntry) => [e.phoneNo, e.name])));
     });
 
+    fetch('/api/version/check')
+      .then(r => r.json())
+      .then((d: { hasUpdate: boolean; latest: string | null }) => {
+        if (d.hasUpdate && d.latest) setUpdateBanner({ latest: d.latest });
+      })
+      .catch(() => {});
+
     return () => cancelAnimationFrame(rafId);
   }, []);
 
@@ -170,6 +178,29 @@ export default function DashboardPage() {
       >
         <Title order={2}>Dashboard</Title>
       </Box>
+
+      {updateBanner && (
+        <Alert
+          icon={<IconInfoCircle size={16} />}
+          color="blue"
+          withCloseButton
+          closeButtonLabel="Dismiss"
+          onClose={() => setUpdateBanner(null)}
+        >
+          <Group gap="xs" wrap="nowrap">
+            <Text size="sm">
+              Version <strong>v{updateBanner.latest}</strong> is available.{' '}
+              <Anchor href={`https://github.com/foureight84/CallAttendantNext/releases/tag/v${updateBanner.latest}`} target="_blank" rel="noopener noreferrer" size="sm">
+                View release
+              </Anchor>
+              {' · '}
+              <Anchor href="https://github.com/foureight84/CallAttendantNext#updating" target="_blank" rel="noopener noreferrer" size="sm">
+                How to update
+              </Anchor>
+            </Text>
+          </Group>
+        </Alert>
+      )}
 
       <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="md">
         {statCards.map((s) => (
