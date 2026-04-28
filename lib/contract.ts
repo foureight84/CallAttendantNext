@@ -13,6 +13,13 @@ export const CallLogSchema = z.object({
   systemDateTime: z.string().nullable(),
   action:         z.string().nullable(),
   reason:         z.string().nullable(),
+  lineType:       z.string().nullable().optional(),
+  carrier:        z.string().nullable().optional(),
+  city:           z.string().nullable().optional(),
+  region:         z.string().nullable().optional(),
+  country:        z.string().nullable().optional(),
+  fraudScore:     z.number().nullable().optional(),
+  riskFlags:      z.string().nullable().optional(),
 });
 
 export const ListEntrySchema = z.object({
@@ -71,11 +78,14 @@ export const AppSettingsSchema = z.object({
   mqttNotifyVoicemail:    z.boolean(),
   mqttNotifyBlocked:      z.boolean(),
   mqttNotifyAll:          z.boolean(),
-  robocallCleanupEnabled: z.boolean(),
-  robocallCleanupCron:    z.string().refine(val => { try { CronExpressionParser.parse(val); return true; } catch { return false; } }, { message: 'Invalid cron expression' }),
+  robocallCleanupEnabled:  z.boolean(),
+  robocallCleanupCron:     z.string().refine(val => { try { CronExpressionParser.parse(val); return true; } catch { return false; } }, { message: 'Invalid cron expression' }),
+  robocallCleanupUseIpqs:  z.boolean(),
   dtmfRemovalEnabled:     z.boolean(),
   dtmfRemovalKey:         z.string(),
   wizardCompleted:        z.boolean(),
+  ipqsApiKey:             z.string(),
+  ipqsStrictness:         z.number(),
 });
 
 const OkSchema = z.object({ ok: z.literal(true) });
@@ -148,6 +158,20 @@ export const contract = c.router({
       path: '/api/settings',
       body: AppSettingsSchema.partial().omit({ serialPort: true, serialBaudRate: true }),
       responses: { 200: OkSchema },
+    },
+    ipqsUsage: {
+      method: 'GET',
+      path: '/api/settings/ipqs-usage',
+      responses: {
+        200: z.object({
+          success: z.boolean(),
+          credits: z.number().optional(),
+          usage: z.number().optional(),
+          phoneUsage: z.number().optional(),
+          exhausted: z.boolean().optional(),
+          message: z.string().optional(),
+        }),
+      },
     },
   }),
 });

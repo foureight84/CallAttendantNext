@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { Table, Badge, Title, Stack, TextInput, Group, Pagination, Text, Button, Select, Card, UnstyledButton, Menu, ActionIcon, Box } from '@mantine/core';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Table, Badge, Title, Stack, TextInput, Group, Pagination, Text, Button, Select, Card, UnstyledButton, Menu, ActionIcon, Box, Tooltip } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
-import { IconRecordMail, IconDots, IconAddressBook, IconBan } from '@tabler/icons-react';
+import { IconRecordMail, IconDots, IconAddressBook, IconBan, IconChevronDown, IconChevronRight } from '@tabler/icons-react';
 import { AddToListModal } from '@/components/AddToListModal';
 import { VoicemailModal } from '@/components/VoicemailModal';
 import { apiClient } from '@/lib/api-client';
@@ -12,6 +12,36 @@ import type { CallLog, ListEntry, Message } from '@/lib/contract';
 function ActionBadge({ action }: { action: string | null }) {
   const colorMap: Record<string, string> = { Permitted: 'green', Blocked: 'red', Screened: 'yellow' };
   return <Badge color={colorMap[action ?? ''] ?? 'gray'}>{action ?? 'Unknown'}</Badge>;
+}
+
+function hasIpqsMeta(call: CallLog): boolean {
+  return !!(call.lineType || call.carrier || call.city || call.region || call.country || call.fraudScore != null || call.riskFlags);
+}
+
+function FraudScoreBadge({ score }: { score: number }) {
+  const color = score >= 90 ? 'red' : score >= 75 ? 'orange' : score >= 50 ? 'yellow' : 'green';
+  return <Badge size="sm" color={color} variant="light">fraud score: {score}</Badge>;
+}
+
+function CallerMeta({ call }: { call: CallLog }) {
+  const location = [call.city, call.region, call.country].filter(Boolean).join(', ');
+  const flags = call.riskFlags ? call.riskFlags.split(',').filter(Boolean) : [];
+  return (
+    <Group gap="xs" wrap="wrap">
+      {call.lineType && <Badge size="sm" variant="outline" color="blue">{call.lineType}</Badge>}
+      {call.carrier && <Text size="xs" c="dimmed">{call.carrier}</Text>}
+      {location && <Text size="xs" c="dimmed">{location}</Text>}
+      {call.fraudScore != null && <FraudScoreBadge score={call.fraudScore} />}
+      {flags.map(f => {
+        const label = f.replace(/_/g, ' ');
+        const tooltip = f === 'do_not_call'
+          ? 'Registered on the FCC Do Not Call list — intended for telemarketers, does not indicate spam'
+          : undefined;
+        const badge = <Badge key={f} size="sm" color={f === 'do_not_call' ? 'gray' : 'red'} variant="light">{label}</Badge>;
+        return tooltip ? <Tooltip key={f} label={tooltip} multiline maw={260}>{badge}</Tooltip> : badge;
+      })}
+    </Group>
+  );
 }
 
 function resolveCallerName(
@@ -43,6 +73,13 @@ export default function CallsPage() {
   const [modal, setModal] = useState<{ list: 'whitelist' | 'blacklist'; call: CallLog } | null>(null);
   const [voicemailMap, setVoicemailMap] = useState<Map<number, Message>>(new Map());
   const [voicemailModal, setVoicemailModal] = useState<{ message: Message; call: CallLog } | null>(null);
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+
+  const toggleRow = (id: number) => setExpandedRows(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
 
   const loadLists = useCallback(() => {
     Promise.all([
@@ -159,6 +196,7 @@ export default function CallsPage() {
               <Table.Th visibleFrom="sm">Reason</Table.Th>
               <Table.Th></Table.Th>
               <Table.Th></Table.Th>
+              <Table.Th></Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
@@ -166,69 +204,89 @@ export default function CallsPage() {
               const inList = !!call.number && (whitelist.has(call.number) || blacklist.has(call.number));
               const displayName = resolveCallerName(call.number, call.name, whitelist, blacklist);
               const voicemail = voicemailMap.get(call.callLogId);
+              const hasMeta = hasIpqsMeta(call);
+              const expanded = expandedRows.has(call.callLogId);
               return (
-                <Table.Tr key={call.callLogId}>
-                  <Table.Td>{call.callLogId}</Table.Td>
-                  <Table.Td>{call.date ?? '—'}</Table.Td>
-                  <Table.Td>{call.time ?? '—'}</Table.Td>
-                  <Table.Td>{displayName}</Table.Td>
-                  <Table.Td>{call.number ?? '—'}</Table.Td>
-                  <Table.Td visibleFrom="sm"><ActionBadge action={call.action} /></Table.Td>
-                  <Table.Td visibleFrom="sm" style={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {call.reason ?? '—'}
-                  </Table.Td>
-                  <Table.Td>
-                    {voicemail && (
-                      <UnstyledButton onClick={() => setVoicemailModal({ message: voicemail, call })}>
-                        <IconRecordMail
-                          size={26}
-                          stroke={1.5}
-                          color={voicemail.played === 0
-                            ? 'var(--mantine-color-blue-6)'
-                            : 'var(--mantine-color-dimmed)'}
-                        />
-                      </UnstyledButton>
-                    )}
-                  </Table.Td>
-                  <Table.Td>
-                    {call.number && !inList && (
-                      <>
-                        <Box visibleFrom="sm">
-                          <Group gap={6} wrap="nowrap">
-                            <Button size="xs" variant="light" color="green" onClick={() => setModal({ list: 'whitelist', call })}>
-                              Add to Phonebook
-                            </Button>
-                            <Button size="xs" variant="light" color="red" onClick={() => setModal({ list: 'blacklist', call })}>
-                              Block
-                            </Button>
-                          </Group>
-                        </Box>
-                        <Box hiddenFrom="sm">
-                          <Menu position="bottom-end" withinPortal>
-                            <Menu.Target>
-                              <ActionIcon variant="subtle" size="sm">
-                                <IconDots size={16} />
-                              </ActionIcon>
-                            </Menu.Target>
-                            <Menu.Dropdown>
-                              <Menu.Item leftSection={<IconAddressBook size={14} />} color="green" onClick={() => setModal({ list: 'whitelist', call })}>
+                <React.Fragment key={call.callLogId}>
+                  <Table.Tr>
+                    <Table.Td>{call.callLogId}</Table.Td>
+                    <Table.Td>{call.date ?? '—'}</Table.Td>
+                    <Table.Td>{call.time ?? '—'}</Table.Td>
+                    <Table.Td>{displayName}</Table.Td>
+                    <Table.Td>{call.number ?? '—'}</Table.Td>
+                    <Table.Td visibleFrom="sm"><ActionBadge action={call.action} /></Table.Td>
+                    <Table.Td visibleFrom="sm" style={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {call.reason ?? '—'}
+                    </Table.Td>
+                    <Table.Td>
+                      {voicemail && (
+                        <UnstyledButton onClick={() => setVoicemailModal({ message: voicemail, call })}>
+                          <IconRecordMail
+                            size={26}
+                            stroke={1.5}
+                            color={voicemail.played === 0
+                              ? 'var(--mantine-color-blue-6)'
+                              : 'var(--mantine-color-dimmed)'}
+                          />
+                        </UnstyledButton>
+                      )}
+                    </Table.Td>
+                    <Table.Td>
+                      {call.number && !inList && (
+                        <>
+                          <Box visibleFrom="sm">
+                            <Group gap={6} wrap="nowrap">
+                              <Button size="xs" variant="light" color="green" onClick={() => setModal({ list: 'whitelist', call })}>
                                 Add to Phonebook
-                              </Menu.Item>
-                              <Menu.Item leftSection={<IconBan size={14} />} color="red" onClick={() => setModal({ list: 'blacklist', call })}>
+                              </Button>
+                              <Button size="xs" variant="light" color="red" onClick={() => setModal({ list: 'blacklist', call })}>
                                 Block
-                              </Menu.Item>
-                            </Menu.Dropdown>
-                          </Menu>
-                        </Box>
-                      </>
-                    )}
-                  </Table.Td>
-                </Table.Tr>
+                              </Button>
+                            </Group>
+                          </Box>
+                          <Box hiddenFrom="sm">
+                            <Menu position="bottom-end" withinPortal>
+                              <Menu.Target>
+                                <ActionIcon variant="subtle" size="sm">
+                                  <IconDots size={16} />
+                                </ActionIcon>
+                              </Menu.Target>
+                              <Menu.Dropdown>
+                                <Menu.Item leftSection={<IconAddressBook size={14} />} color="green" onClick={() => setModal({ list: 'whitelist', call })}>
+                                  Add to Phonebook
+                                </Menu.Item>
+                                <Menu.Item leftSection={<IconBan size={14} />} color="red" onClick={() => setModal({ list: 'blacklist', call })}>
+                                  Block
+                                </Menu.Item>
+                              </Menu.Dropdown>
+                            </Menu>
+                          </Box>
+                        </>
+                      )}
+                    </Table.Td>
+                    <Table.Td>
+                      {hasMeta && (
+                        <Tooltip label={expanded ? 'Hide caller info' : 'Show caller info'} position="left">
+                          <ActionIcon variant="subtle" size="sm" onClick={() => toggleRow(call.callLogId)}>
+                            {expanded ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
+                          </ActionIcon>
+                        </Tooltip>
+                      )}
+                    </Table.Td>
+                  </Table.Tr>
+                  {hasMeta && expanded && (
+                    <Table.Tr style={{ background: 'var(--mantine-color-default-hover)' }}>
+                      <Table.Td colSpan={10} py={6} px="md">
+                        <CallerMeta call={call} />
+                      </Table.Td>
+                    </Table.Tr>
+                  )}
+                </React.Fragment>
               );
             })}
             {rows.length === 0 && (
               <Table.Tr>
-                <Table.Td colSpan={9} style={{ textAlign: 'center' }}>No calls found</Table.Td>
+                <Table.Td colSpan={10} style={{ textAlign: 'center' }}>No calls found</Table.Td>
               </Table.Tr>
             )}
           </Table.Tbody>
@@ -254,6 +312,11 @@ export default function CallsPage() {
                 <Text size="xs" c="dimmed" mb="xs">{call.date ?? '—'} {call.time ?? ''}</Text>
                 {call.reason && (
                   <Text size="sm" c="dimmed" mb="xs">{call.reason}</Text>
+                )}
+                {hasIpqsMeta(call) && (
+                  <Box mb="xs">
+                    <CallerMeta call={call} />
+                  </Box>
                 )}
                 <Group justify="space-between" align="center" mt="xs">
                   <div>

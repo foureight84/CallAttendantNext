@@ -48,6 +48,7 @@ If you have a hardware modem not on this list and would like support added, open
 - [Greeting Scripts](#greeting-scripts)
 - [SMTP Email Notifications](#smtp-email-notifications-1)
 - [MQTT Notifications](#mqtt-notifications-1)
+- [IPQualityScore (IPQS) Integration](#ipqualityscore-ipqs-integration)
 - [Robocall Blocklist Cleanup](#robocall-blocklist-cleanup)
 - [DTMF Opt-Out for Blocked Callers](#dtmf-opt-out-for-blocked-callers)
 - [Screenshots](#screenshots)
@@ -71,6 +72,7 @@ If you have a hardware modem not on this list and would like support added, open
 - **Easier debugging** — structured log events streamed to the browser via SSE; Debug Console page
 - **Piper TTS instead of WAV files** — greetings are synthesized on demand from `.txt` scripts; no per-voice audio files to manage
 - **ffmpeg voicemail encoding** — recordings saved as MP3 (falls back to WAV if ffmpeg is unavailable); filenames match the Python pattern: `{callLogId}_{number}_{name}_{MMDDyy_HHMM}.mp3` (e.g. `42_8005551234_JOHN_SMITH_032621_1423.mp3`)
+- **IPQualityScore (IPQS) integration** — optional second spam screener with a 0–100 fraud score, reverse-name lookup, line type (Mobile/VoIP/Landline), carrier, and geographic data enriched on every call log entry; runs alongside Nomorobo or as a standalone replacement
 - **Updated Nomorobo scraping** — adapted for their current website format
 - **Improved serial port handling** — faster modem detection, reduced call response time. Optimizations were focused on being able to pick up the call and screen before the second ring. For those with first-call supression support on their telephone, you will never hear an unwanted call.
 - **Raspberry Pi GPIO LED support** — toggle via `ENABLE_GPIO=true` in `.env`
@@ -81,7 +83,6 @@ If you have a hardware modem not on this list and would like support added, open
 ---
 
 ## Roadmap
-- **SEON API integration** - provide additional Caller ID discovery as well as number reputation to weave out fraudulent and malicious callers that may not be on NOMOROBO's database.
 - **Voicemail Transcription** - can't guarantee but something to explore if it is feasible to deploy a Speech-to-text feature. Whisper-cpp is a likely candidate.
 - **User Request** - While I am the only one using this app daily, if we get more adoptions and you feel that a must-have feature is missing, then feel free to open a [Feature-Request] ticket in the Issues section.
 
@@ -161,8 +162,10 @@ All other keys are optional and fall back to sensible defaults.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `SCREENING_MODE` | `whitelist,blacklist` | Comma-separated list of active screening modes. Values: `whitelist`, `blacklist` |
-| `BLOCK_SERVICE` | `NOMOROBO` | External spam lookup service. Currently only `NOMOROBO` is supported |
-| `SPAM_THRESHOLD` | `2` | Nomorobo score at which a caller is considered spam and blocked. `1` = suspicious, `2` = confirmed spam |
+| `BLOCK_SERVICE` | `NOMOROBO` | External spam lookup service: `NOMOROBO`, `IPQS`, `BOTH` (parallel — higher score wins), or `NONE` |
+| `SPAM_THRESHOLD` | `2` | Score threshold at which a caller is blocked. `1` = suspicious, `2` = likely spam (recommended), `3` = confirmed/high-confidence only |
+| `IPQS_API_KEY` | *(empty)* | IPQualityScore API key. Required when `BLOCK_SERVICE` is `IPQS` or `BOTH`. Preferred: set in the web UI Settings page |
+| `IPQS_STRICTNESS` | `0` | IPQS strictness level (0–3). Higher values increase fraud detection sensitivity. Only used when `BLOCK_SERVICE` is `IPQS` or `BOTH` |
 | `AUTO_BLOCK_SPAM` | `true` | Automatically add callers to the blocklist when their spam score meets the threshold |
 | `RINGS_BEFORE_VM` | `4` | Rings before answering for whitelisted callers |
 | `RINGS_BEFORE_VM_SCREENED` | `2` | Rings before answering for screened (unknown) callers |
@@ -988,15 +991,63 @@ Messages are fire-and-forget (`retain: false`). Each call produces exactly one m
 
 ---
 
+## IPQualityScore (IPQS) Integration
+
+[IPQualityScore](https://www.ipqualityscore.com/) is an optional second spam screener that complements or replaces Nomorobo. IPQS provides a richer signal than Nomorobo's binary lookup: a 0–100 fraud score, carrier-level line type detection, reverse name lookup, and geographic data that is stored directly on each call log entry.
+
+### What IPQS adds over Nomorobo
+
+| Feature | Nomorobo | IPQS |
+|---------|----------|------|
+| Spam score | 0–2 | 0–100 mapped to 0–3 |
+| Line type (Mobile/VoIP/Landline) | ✗ | ✓ |
+| Carrier name | ✗ | ✓ |
+| Geographic data (city, region, country) | ✗ | ✓ |
+| Reverse name lookup | ✗ | ✓ (replaces missing caller-ID name) |
+| Do-not-call registry | ✗ | ✓ |
+| Free tier | ✓ (scraping) | ✓ (1,000 lookups/month) |
+
+### Score mapping
+
+IPQS `fraud_score` (0–100) is mapped to the same internal 0–3 scale used by the spam threshold slider:
+
+| Internal score | Meaning | IPQS condition |
+|---|---|---|
+| 3 | Confirmed spam | `spammer=true` OR `fraud_score ≥ 90` OR `recent_abuse=true` |
+| 2 | Likely spam | `fraud_score ≥ 75` |
+| 1 | Suspicious | `fraud_score ≥ 50` OR `risky=true` |
+| 0 | Clean | None of the above |
+
+> **Note:** `do_not_call` is the FCC Do Not Call registry — it indicates a number that has opted out of telemarketing, not a spam signal. Call Attendant displays this badge on the call log for context but does not factor it into the spam score.
+
+The existing **Spam Threshold** slider works unchanged — the default of `2` blocks Likely and Confirmed spam from either service.
+
+### Getting an API key
+
+1. Go to [https://www.ipqualityscore.com/](https://www.ipqualityscore.com/) and click **Register**.
+2. Once your account is created, open **Settings & Account Management** in the left side menu, then select **API Key** from the sub-menu.
+3. Rename the existing **Start API key** if you'd like a more memorable label. Copy the API key. **Do not** set an expiration date on the key.
+4. In the Call Attendant web UI, go to **Settings → Robocall Detection**, set **Block Service** to `IPQualityScore` (or `Both`), paste your API key, and click **Save**.
+
+### Modes
+
+- **IPQualityScore only** — IPQS is the sole external screener. Nomorobo is not called.
+- **Both (parallel)** — Nomorobo and IPQS are called simultaneously on each incoming call. The higher of the two scores determines the action, so a number caught by either service is blocked. IPQS caller metadata (line type, carrier, location) is stored regardless.
+- **Nomorobo only** — original behavior, IPQS is not called.
+
+> **Note:** In `Both` mode, each screened call consumes one IPQS credit. At 1,000 free credits per month, this covers roughly 33 calls/day. The settings page shows live credit usage and will warn you if credits are exhausted. When credits run out, IPQS lookups are automatically paused until the 1st of the next month — Nomorobo (if enabled) and your blocklist/whitelist rules continue to run normally.
+
+---
+
 ## Robocall Blocklist Cleanup
 
-Phone numbers flagged as robocallers don't stay with the same owner forever — numbers change hands, get recycled, and reassigned to legitimate individuals or businesses. A number that was a robocall last year may belong to a real person today. The blocklist cleanup feature periodically re-verifies entries that were added with **"Robocall"** as the reason against Nomorobo, and removes any that are no longer flagged.
+Phone numbers flagged as robocallers don't stay with the same owner forever — numbers change hands, get recycled, and reassigned to legitimate individuals or businesses. A number that was a robocall last year may belong to a real person today. The blocklist cleanup feature periodically re-verifies auto-blocked entries against Nomorobo (and optionally IPQS) and removes any that are no longer flagged.
 
 ### How it works
 
-1. Call Attendant scans the blocklist for entries whose reason contains "robocall" (case-insensitive).
-2. Each number is checked against Nomorobo with a 10-second delay between lookups to avoid rate limiting.
-3. Numbers that are no longer flagged at or above the configured spam threshold are removed from the blocklist.
+1. Call Attendant scans the blocklist for entries that were auto-added by a screening service — reasons containing "robocall" (case-insensitive) or starting with `Nomorobo:` or `IPQS:`.
+2. Each number is checked against Nomorobo with a 10-second delay between lookups to avoid rate limiting. If **Also verify with IPQS** is enabled and an IPQS API key is configured, the IPQS check runs in parallel for each entry — a number is only removed if both services agree it is no longer flagged.
+3. Numbers that score below the configured spam threshold from all enabled services are removed from the blocklist.
 4. Results are logged to the modem log so you can see exactly what was checked and removed.
 
 ### Schedule
@@ -1005,7 +1056,7 @@ The job runs on a configurable cron schedule (default: **Saturday at 2:00 AM**).
 
 You can also trigger a manual run at any time with the **Run Now** button. Because the 10-second inter-lookup delay means a large blocklist can take a while, the UI shows how many numbers remain and an estimated time to completion while the job is running. The Run Now button is disabled while a run is in progress to prevent duplicate jobs.
 
-> **Note:** Only entries added with "Robocall" as the reason are re-verified. Numbers you manually added to the blocklist (e.g. with a custom reason like "Telemarketer") are never touched.
+> **Note:** Only entries auto-added by a screening service are re-verified — reasons containing "robocall" or starting with `Nomorobo:` / `IPQS:`. Numbers you manually added to the blocklist (e.g. with a custom reason like "Telemarketer") are never touched.
 
 ### Enabling
 

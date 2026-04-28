@@ -13,5 +13,7 @@ export async function register() {
     }
     const { scheduleRobocallCleanup } = await import('./lib/modem/robocallCleanup');
     scheduleRobocallCleanup();
+    const { startUsageRefresh } = await import('./lib/modem/ipqs');
+    startUsageRefresh().catch(() => {});
   }
 }
