@@ -464,7 +464,9 @@ export async function getSettings(): Promise<AppSettings> {
     wizardCompleted:    (map['wizardCompleted']    ?? 'false') === 'true',
     ipqsApiKey:          map['ipqsApiKey']         ?? config.ipqsApiKey,
     ipqsStrictness:      parseInt(map['ipqsStrictness'] ?? String(config.ipqsStrictness), 10),
-    ipqsCountries:       map['ipqsCountries'] !== undefined ? map['ipqsCountries'].split(',').map(s => s.trim()).filter(Boolean) : config.ipqsCountries,
+    ipqsCountries:       map['ipqsCountries'] !== undefined
+      ? map['ipqsCountries'].split(',').map(s => s.trim()).filter(Boolean)
+      : [],
   };
 }
 
