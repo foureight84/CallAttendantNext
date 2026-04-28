@@ -9,6 +9,7 @@ export const config = {
   spamThreshold: parseInt(process.env.SPAM_THRESHOLD ?? '2', 10),
   ipqsApiKey: process.env.IPQS_API_KEY ?? '',
   ipqsStrictness: parseInt(process.env.IPQS_STRICTNESS ?? '0', 10),
+  ipqsCountries: (process.env.IPQS_COUNTRIES ?? '').split(',').map(s => s.trim()).filter(Boolean),
   ringsBeforeVm: parseInt(process.env.RINGS_BEFORE_VM ?? '4', 10),
   ringsBeforeVmScreened:  parseInt(process.env.RINGS_BEFORE_VM_SCREENED  ?? '2', 10),
   blocklistAction:        parseInt(process.env.BLOCKLIST_ACTION           ?? '2', 10),

@@ -59,7 +59,7 @@ export function isIpqsExhausted(): boolean {
 export class IpqsChecker {
   async check(phoneNumber: string): Promise<IpqsResult> {
     const { getSettings } = await import('../db');
-    const { ipqsApiKey, ipqsStrictness } = await getSettings();
+    const { ipqsApiKey, ipqsStrictness, ipqsCountries } = await getSettings();
 
     if (!ipqsApiKey) {
       return { score: 0, reason: 'IPQS: no API key configured', raw: null };
@@ -71,6 +71,7 @@ export class IpqsChecker {
 
     const url = new URL(`https://www.ipqualityscore.com/api/json/phone/${ipqsApiKey}/${encodeURIComponent(phoneNumber)}`);
     if (ipqsStrictness > 0) url.searchParams.set('strictness', String(ipqsStrictness));
+    for (const country of ipqsCountries) url.searchParams.append('country[]', country);
 
     try {
       const res = await fetch(url.toString(), {

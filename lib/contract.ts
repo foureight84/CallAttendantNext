@@ -86,6 +86,7 @@ export const AppSettingsSchema = z.object({
   wizardCompleted:        z.boolean(),
   ipqsApiKey:             z.string(),
   ipqsStrictness:         z.number(),
+  ipqsCountries:          z.array(z.string()),
 });
 
 const OkSchema = z.object({ ok: z.literal(true) });

@@ -8,6 +8,7 @@ import { useForm } from '@mantine/form';
 import { CronExpressionParser } from 'cron-parser';
 import { apiClient } from '@/lib/api-client';
 import type { AppSettings } from '@/lib/contract';
+import { IPQS_COUNTRIES } from '@/lib/countries';
 import { SetupWizard } from '@/components/SetupWizard';
 
 function parseCronFields(expr: string): [string, string, string, string, string] {
@@ -106,6 +107,7 @@ export default function SettingsPage() {
       wizardCompleted: false,
       ipqsApiKey: '',
       ipqsStrictness: 0,
+      ipqsCountries: [],
     },
     validate: {
       ipqsApiKey: (value, values) => {
@@ -384,6 +386,14 @@ export default function SettingsPage() {
                     min={0}
                     max={3}
                     {...form.getInputProps('ipqsStrictness')}
+                  />
+                  <MultiSelect
+                    label="Country Filter"
+                    description="Restrict IPQS lookups to phone numbers from these countries — typically the country where Call Attendant is running (e.g. US, CA for North America). Leave empty to allow all countries."
+                    placeholder="Search countries…"
+                    searchable
+                    data={IPQS_COUNTRIES}
+                    {...form.getInputProps('ipqsCountries')}
                   />
                   {ipqsUsage && (
                     <Stack gap={4}>
