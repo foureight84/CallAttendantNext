@@ -2,8 +2,10 @@ import { CronExpressionParser } from 'cron-parser';
 import { getSettings, getRobocallBlacklist, removeFromBlacklist } from '../db';
 import { modemLog } from '../events';
 import { NomoroboChecker } from './nomorobo';
+import { IpqsChecker } from './ipqs';
 
-const checker = new NomoroboChecker();
+const nomorobo = new NomoroboChecker();
+const ipqs = new IpqsChecker();
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -41,19 +43,33 @@ export async function runRobocallCleanup(): Promise<void> {
       return;
     }
 
+    const useIpqs = settings.robocallCleanupUseIpqs && !!settings.ipqsApiKey;
+    const checkers = useIpqs ? 'Nomorobo + IPQS' : 'Nomorobo';
     const estMins = Math.round(n * 10 / 60);
-    modemLog('info', `[cleanup] Starting — ${n} number${n === 1 ? '' : 's'} to check (~${estMins}m estimated)`);
+    modemLog('info', `[cleanup] Starting — ${n} number${n === 1 ? '' : 's'} to check via ${checkers} (~${estMins}m estimated)`);
 
     let removed = 0;
     for (let i = 0; i < entries.length; i++) {
       const entry = entries[i]!;
-      const result = await checker.check(entry.phoneNo);
-      if (result.score === 0) {
+
+      const [nomoroboResult, ipqsResult] = await Promise.all([
+        nomorobo.check(entry.phoneNo),
+        useIpqs ? ipqs.check(entry.phoneNo) : Promise.resolve(null),
+      ]);
+
+      const nomoroboClean = nomoroboResult.score < settings.spamThreshold;
+      const ipqsClean = ipqsResult === null || ipqsResult.score < settings.spamThreshold;
+
+      if (nomoroboClean && ipqsClean) {
         await removeFromBlacklist(entry.phoneNo);
         removed++;
-        modemLog('info', `[cleanup] Removed ${entry.phoneNo} — no longer flagged by Nomorobo`);
+        modemLog('info', `[cleanup] Removed ${entry.phoneNo} — no longer flagged`);
       } else {
-        modemLog('info', `[cleanup] Kept ${entry.phoneNo} — still flagged: ${result.reason}`);
+        const flaggedBy = [
+          !nomoroboClean ? `Nomorobo: ${nomoroboResult.reason}` : '',
+          ipqsResult && !ipqsClean ? `IPQS: ${ipqsResult.reason}` : '',
+        ].filter(Boolean).join('; ');
+        modemLog('info', `[cleanup] Kept ${entry.phoneNo} — still flagged: ${flaggedBy}`);
       }
       if (i < entries.length - 1) await sleep(10_000);
     }

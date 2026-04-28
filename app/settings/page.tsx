@@ -28,6 +28,21 @@ function isCronValid(expr: string): boolean {
   try { CronExpressionParser.parse(expr); return true; } catch { return false; }
 }
 
+function countCronRunsPerMonth(expr: string): number {
+  try {
+    const interval = CronExpressionParser.parse(expr);
+    const cutoff = Date.now() + 30 * 24 * 60 * 60 * 1000;
+    let count = 0;
+    while (count < 200) {
+      if (interval.next().toDate().getTime() > cutoff) break;
+      count++;
+    }
+    return count;
+  } catch {
+    return 0;
+  }
+}
+
 export default function SettingsPage() {
   const [models, setModels] = useState<string[]>([]);
   const [previewText, setPreviewText] = useState('Hello, this is a test of the voice synthesis system.');
@@ -85,6 +100,7 @@ export default function SettingsPage() {
       mqttNotifyAll: false,
       robocallCleanupEnabled: false,
       robocallCleanupCron: '0 2 * * 6',
+      robocallCleanupUseIpqs: false,
       dtmfRemovalEnabled: false,
       dtmfRemovalKey: '9',
       wizardCompleted: false,
@@ -473,7 +489,8 @@ export default function SettingsPage() {
               </Group>
               <Text size="sm" c="dimmed">
                 Phone numbers can change hands over time. This cleanup periodically re-checks blocklist entries
-                that were added with &quot;Robocall&quot; as the reason against Nomorobo. Numbers that are no longer
+                that were added with &quot;Robocall&quot; as the reason against Nomorobo
+                {form.values.robocallCleanupUseIpqs && form.values.ipqsApiKey ? ' and IPQS' : ''}. Numbers that are no longer
                 flagged are automatically removed from your blocklist.
               </Text>
 
@@ -537,6 +554,47 @@ export default function SettingsPage() {
                         <Text size="xs" c="dimmed">No robocall entries in blocklist</Text>
                       )}
                     </Group>
+
+                    {form.values.ipqsApiKey && (() => {
+                      const runsPerMonth = countCronRunsPerMonth(form.values.robocallCleanupCron);
+                      const creditsPerRun = cleanupPendingCount;
+                      const creditsPerMonth = creditsPerRun * runsPerMonth;
+                      const totalCredits = ipqsUsage?.credits ?? 1000;
+                      const usedCredits = ipqsUsage?.phoneUsage ?? 0;
+                      const remainingAfterCleanup = totalCredits - usedCredits - creditsPerMonth;
+                      return (
+                        <Stack gap={6} mt="xs">
+                          <Group align="center" gap="sm">
+                            <Switch
+                              size="sm"
+                              {...form.getInputProps('robocallCleanupUseIpqs', { type: 'checkbox' })}
+                            />
+                            <Text size="sm">Also verify with IPQS</Text>
+                          </Group>
+                          <Text size="xs" c="dimmed">
+                            When enabled, a number is only removed if both Nomorobo and IPQS confirm it is no longer flagged.
+                          </Text>
+                          {form.values.robocallCleanupUseIpqs && (
+                            <Box p="xs" style={{ borderRadius: 6, background: 'var(--mantine-color-default-hover)' }}>
+                              <Text size="xs" fw={500} mb={4}>Estimated IPQS credit impact</Text>
+                              <Text size="xs" c="dimmed">
+                                {creditsPerRun} {creditsPerRun === 1 ? 'entry' : 'entries'} × {runsPerMonth} {runsPerMonth === 1 ? 'run' : 'runs'}/month = <strong>{creditsPerMonth} credits/month</strong>
+                              </Text>
+                              <Text size="xs" c={remainingAfterCleanup < 0 ? 'red' : remainingAfterCleanup < totalCredits * 0.1 ? 'orange' : 'dimmed'} mt={2}>
+                                {ipqsUsage
+                                  ? `${usedCredits} used + ${creditsPerMonth} cleanup = ${usedCredits + creditsPerMonth} of ${totalCredits} (${Math.max(0, remainingAfterCleanup)} remaining for live calls)`
+                                  : `${creditsPerMonth} of ${totalCredits} allocated to cleanup`}
+                              </Text>
+                              {remainingAfterCleanup < 0 && (
+                                <Text size="xs" c="red" mt={4}>
+                                  Cleanup alone would exceed the monthly credit limit. Consider reducing cron frequency or upgrading your IPQS plan.
+                                </Text>
+                              )}
+                            </Box>
+                          )}
+                        </Stack>
+                      );
+                    })()}
                   </Stack>
                 );
               })()}

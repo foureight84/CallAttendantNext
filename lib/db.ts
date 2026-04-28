@@ -406,8 +406,9 @@ export interface AppSettings {
   mqttNotifyVoicemail: boolean;
   mqttNotifyBlocked: boolean;
   mqttNotifyAll: boolean;
-  robocallCleanupEnabled: boolean;
-  robocallCleanupCron: string;
+  robocallCleanupEnabled:  boolean;
+  robocallCleanupCron:     string;
+  robocallCleanupUseIpqs:  boolean;
   dtmfRemovalEnabled: boolean;
   dtmfRemovalKey: string;
   wizardCompleted: boolean;
@@ -454,8 +455,9 @@ export async function getSettings(): Promise<AppSettings> {
     mqttNotifyVoicemail:  (map['mqttNotifyVoicemail']  ?? String(config.mqttNotifyVoicemail))  === 'true',
     mqttNotifyBlocked:    (map['mqttNotifyBlocked']    ?? String(config.mqttNotifyBlocked))    === 'true',
     mqttNotifyAll:        (map['mqttNotifyAll']        ?? String(config.mqttNotifyAll))        === 'true',
-    robocallCleanupEnabled: (map['robocallCleanupEnabled'] ?? String(config.robocallCleanupEnabled)) === 'true',
-    robocallCleanupCron:     map['robocallCleanupCron']    ?? config.robocallCleanupCron,
+    robocallCleanupEnabled:  (map['robocallCleanupEnabled']  ?? String(config.robocallCleanupEnabled))  === 'true',
+    robocallCleanupCron:      map['robocallCleanupCron']     ?? config.robocallCleanupCron,
+    robocallCleanupUseIpqs:  (map['robocallCleanupUseIpqs']  ?? String(config.robocallCleanupUseIpqs))  === 'true',
     dtmfRemovalEnabled: (map['dtmfRemovalEnabled'] ?? String(config.dtmfRemovalEnabled)) === 'true',
     dtmfRemovalKey:      map['dtmfRemovalKey']    ?? config.dtmfRemovalKey,
     wizardCompleted:    (map['wizardCompleted']    ?? 'false') === 'true',
