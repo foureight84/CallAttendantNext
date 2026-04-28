@@ -9,6 +9,13 @@ export const callLog = sqliteTable('CallLog', {
   systemDateTime: text('SystemDateTime'),
   action:         text('Action'),
   reason:         text('Reason'),
+  lineType:       text('LineType'),
+  carrier:        text('Carrier'),
+  city:           text('City'),
+  region:         text('Region'),
+  country:        text('Country'),
+  fraudScore:     integer('FraudScore'),
+  riskFlags:      text('RiskFlags'),
 });
 
 export const whitelist = sqliteTable('Whitelist', {

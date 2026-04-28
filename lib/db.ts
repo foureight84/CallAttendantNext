@@ -52,6 +52,20 @@ export async function initDb(): Promise<void> {
       Value TEXT NOT NULL
     );
   `);
+  // Idempotent column additions for existing databases.
+  // SQLite ALTER TABLE ADD COLUMN only fails if the column already exists — safe to ignore.
+  for (const [col, type] of [
+    ['LineType',   'TEXT'],
+    ['Carrier',    'TEXT'],
+    ['City',       'TEXT'],
+    ['Region',     'TEXT'],
+    ['Country',    'TEXT'],
+    ['FraudScore', 'INTEGER'],
+    ['RiskFlags',  'TEXT'],
+  ] as [string, string][]) {
+    await getRawClient().execute(`ALTER TABLE CallLog ADD COLUMN ${col} ${type}`).catch(() => {});
+  }
+
   console.log('[db] Schema initialized');
 }
 
@@ -78,6 +92,8 @@ export type CallLogRow = typeof callLog.$inferSelect;
 export async function insertCallLog(entry: {
   Name: string | null; Number: string | null; Date: string | null;
   Time: string | null; SystemDateTime: string | null; Action: string | null; Reason: string | null;
+  LineType?: string | null; Carrier?: string | null; City?: string | null;
+  Region?: string | null; Country?: string | null; FraudScore?: number | null; RiskFlags?: string | null;
 }): Promise<number> {
   const [row] = await db.insert(callLog).values({
     name: entry.Name,
@@ -87,6 +103,13 @@ export async function insertCallLog(entry: {
     systemDateTime: entry.SystemDateTime,
     action: entry.Action,
     reason: entry.Reason,
+    lineType: entry.LineType ?? null,
+    carrier: entry.Carrier ?? null,
+    city: entry.City ?? null,
+    region: entry.Region ?? null,
+    country: entry.Country ?? null,
+    fraudScore: entry.FraudScore ?? null,
+    riskFlags: entry.RiskFlags ?? null,
   }).returning({ callLogId: callLog.callLogId });
   return row!.callLogId;
 }
@@ -388,6 +411,8 @@ export interface AppSettings {
   dtmfRemovalEnabled: boolean;
   dtmfRemovalKey: string;
   wizardCompleted: boolean;
+  ipqsApiKey: string;
+  ipqsStrictness: number;
 }
 
 export async function getSettings(): Promise<AppSettings> {
@@ -434,6 +459,8 @@ export async function getSettings(): Promise<AppSettings> {
     dtmfRemovalEnabled: (map['dtmfRemovalEnabled'] ?? String(config.dtmfRemovalEnabled)) === 'true',
     dtmfRemovalKey:      map['dtmfRemovalKey']    ?? config.dtmfRemovalKey,
     wizardCompleted:    (map['wizardCompleted']    ?? 'false') === 'true',
+    ipqsApiKey:          map['ipqsApiKey']         ?? config.ipqsApiKey,
+    ipqsStrictness:      parseInt(map['ipqsStrictness'] ?? String(config.ipqsStrictness), 10),
   };
 }
 
@@ -468,6 +495,8 @@ export async function seedSettingsFromEnv(): Promise<void> {
   if (e.ROBOCALL_CLEANUP_CRON       !== undefined) seed.robocallCleanupCron    = config.robocallCleanupCron;
   if (e.DTMF_REMOVAL_ENABLED        !== undefined) seed.dtmfRemovalEnabled     = config.dtmfRemovalEnabled;
   if (e.DTMF_REMOVAL_KEY            !== undefined) seed.dtmfRemovalKey         = config.dtmfRemovalKey;
+  if (e.IPQS_API_KEY                !== undefined) seed.ipqsApiKey             = config.ipqsApiKey;
+  if (e.IPQS_STRICTNESS             !== undefined) seed.ipqsStrictness         = config.ipqsStrictness;
 
   if (Object.keys(seed).length > 0) await saveSettings(seed);
 }

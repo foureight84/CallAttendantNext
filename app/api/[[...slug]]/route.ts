@@ -109,6 +109,25 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     return json({ serialPort: config.serialPort, serialBaudRate: config.serialBaudRate, ...s });
   }
 
+  if (route === 'settings/ipqs-usage') {
+    const { IpqsChecker, getIpqsCachedUsage, isIpqsExhausted } = await import('@/lib/modem/ipqs');
+    const s = await getSettings();
+    if (!s.ipqsApiKey) {
+      return json({ success: false, message: 'No IPQS API key configured' });
+    }
+    const checker = new IpqsChecker();
+    const data = await checker.getUsage(s.ipqsApiKey);
+    const cached = getIpqsCachedUsage();
+    return json({
+      success: data.success,
+      credits: cached?.credits,
+      usage: cached?.usage,
+      phoneUsage: cached?.phone_usage,
+      exhausted: isIpqsExhausted(),
+      message: data.success ? undefined : data.message,
+    });
+  }
+
   if (route === 'version/check') {
     type VersionCache = { tag: string; ts: number };
     const g = globalThis as { __versionCache?: VersionCache };
@@ -163,11 +182,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   }
 
   if (route === 'settings') {
+    const blockService = body.blockService as string | undefined;
+    const ipqsApiKey = (body.ipqsApiKey as string | undefined) ?? '';
+    if ((blockService === 'IPQS' || blockService === 'BOTH') && !ipqsApiKey.trim()) {
+      return json({ error: 'API key is required when IPQS is enabled', path: 'ipqsApiKey' }, 400);
+    }
     await saveSettings(body);
     const saved = await getSettings();
     updateLogConfig({ logFile: saved.logFile, logMaxBytes: saved.logMaxBytes, logKeepFiles: saved.logKeepFiles });
     const { rescheduleRobocallCleanup } = await import('@/lib/modem/robocallCleanup');
     rescheduleRobocallCleanup();
+    if (saved.blockService === 'IPQS' || saved.blockService === 'BOTH') {
+      const { startUsageRefresh } = await import('@/lib/modem/ipqs');
+      startUsageRefresh().catch(() => {});
+    }
     return json({ ok: true });
   }
 

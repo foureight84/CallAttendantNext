@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Stack, Title, Card, Group, Text, Button, Slider, NumberInput, Switch, Select, MultiSelect, Divider, Radio, TextInput, Box, Anchor, Tabs, Code, PasswordInput, Alert, Loader } from '@mantine/core';
+import { Stack, Title, Card, Group, Text, Button, Slider, NumberInput, Switch, Select, MultiSelect, Divider, Radio, TextInput, Box, Anchor, Tabs, Code, PasswordInput, Alert, Loader, Progress, Badge, Tooltip } from '@mantine/core';
 import Link from 'next/link';
 import { notifications } from '@mantine/notifications';
 import { useForm } from '@mantine/form';
@@ -40,6 +40,9 @@ export default function SettingsPage() {
   const [cleanupPendingCount, setCleanupPendingCount] = useState(0);
   const cleanupPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [ipqsUsage, setIpqsUsage] = useState<{ credits: number; phoneUsage: number; exhausted: boolean } | null>(null);
+  const [testingIpqs, setTestingIpqs] = useState(false);
+  const [ipqsTestResult, setIpqsTestResult] = useState<{ ok: boolean; message?: string } | null>(null);
 
   const form = useForm<AppSettings>({
     initialValues: {
@@ -85,11 +88,37 @@ export default function SettingsPage() {
       dtmfRemovalEnabled: false,
       dtmfRemovalKey: '9',
       wizardCompleted: false,
+      ipqsApiKey: '',
+      ipqsStrictness: 0,
+    },
+    validate: {
+      ipqsApiKey: (value, values) => {
+        if ((values.blockService === 'IPQS' || values.blockService === 'BOTH') && !value.trim()) {
+          return 'API key is required when IPQS is enabled';
+        }
+        return null;
+      },
     },
   });
 
+  const fetchIpqsUsage = async () => {
+    try {
+      const res = await fetch('/api/settings/ipqs-usage');
+      if (!res.ok) return;
+      const d = await res.json() as { success: boolean; credits?: number; phoneUsage?: number; exhausted?: boolean };
+      if (d.success && d.credits !== undefined && d.phoneUsage !== undefined) {
+        setIpqsUsage({ credits: d.credits, phoneUsage: d.phoneUsage, exhausted: d.exhausted ?? false });
+      }
+    } catch { /* ignore */ }
+  };
+
   useEffect(() => {
-    apiClient.settings.get().then(data => form.initialize({ ...data, mqttTopicPrefix: data.mqttTopicPrefix || 'callattendant' }));
+    apiClient.settings.get().then(data => {
+      form.initialize({ ...data, mqttTopicPrefix: data.mqttTopicPrefix || 'callattendant' });
+      if (data.blockService === 'IPQS' || data.blockService === 'BOTH') {
+        fetchIpqsUsage();
+      }
+    });
     fetch('/api/piper/models').then(r => r.json()).then(setModels).catch(() => {});
     fetch('/api/blacklist/cleanup').then(r => r.json()).then((d: { running: boolean; pendingCount: number }) => {
       setCleanupRunning(d.running);
@@ -173,6 +202,27 @@ export default function SettingsPage() {
         }
       } catch { /* network error — keep polling */ }
     }, 5000);
+  };
+
+  const handleTestIpqs = async () => {
+    setTestingIpqs(true);
+    setIpqsTestResult(null);
+    try {
+      const { serialPort: _sp, serialBaudRate: _sbr, ...saveable } = form.values;
+      await apiClient.settings.save(saveable);
+      const res = await fetch('/api/settings/ipqs-usage');
+      const d = await res.json() as { success: boolean; credits?: number; phoneUsage?: number; exhausted?: boolean; message?: string };
+      if (d.success && d.credits !== undefined && d.phoneUsage !== undefined) {
+        setIpqsUsage({ credits: d.credits, phoneUsage: d.phoneUsage, exhausted: d.exhausted ?? false });
+        setIpqsTestResult({ ok: true, message: `Connected — ${d.phoneUsage} / ${d.credits} lookups used this period` });
+      } else {
+        setIpqsTestResult({ ok: false, message: d.message ?? 'Unexpected response from IPQS' });
+      }
+    } catch (err) {
+      setIpqsTestResult({ ok: false, message: String(err) });
+    } finally {
+      setTestingIpqs(false);
+    }
   };
 
   const save = form.onSubmit(async (values) => {
@@ -295,11 +345,71 @@ export default function SettingsPage() {
                 label="Block Service"
                 data={[
                   { value: 'NOMOROBO', label: 'Nomorobo' },
+                  { value: 'IPQS', label: 'IPQualityScore (IPQS)' },
+                  { value: 'BOTH', label: 'Both (parallel — higher score wins)' },
                   { value: 'NONE', label: 'None (lists only)' },
                 ]}
                 allowDeselect={false}
                 {...form.getInputProps('blockService')}
               />
+
+              {(form.values.blockService === 'IPQS' || form.values.blockService === 'BOTH') && (
+                <Stack gap="sm">
+                  <Divider label="IPQualityScore Settings" labelPosition="left" />
+                  <PasswordInput
+                    label="IPQS API Key"
+                    description={<>Required. Get a free key at <Anchor href="https://www.ipqualityscore.com/" target="_blank" size="xs">ipqualityscore.com</Anchor> (1,000 free lookups/month).</>}
+                    withAsterisk
+                    {...form.getInputProps('ipqsApiKey')}
+                  />
+                  <NumberInput
+                    label="Strictness Level"
+                    description="0 (default) to 3 — higher values increase fraud detection rigor and may raise scores."
+                    min={0}
+                    max={3}
+                    {...form.getInputProps('ipqsStrictness')}
+                  />
+                  {ipqsUsage && (
+                    <Stack gap={4}>
+                      <Group justify="space-between">
+                        <Text size="sm">Phone lookups this period</Text>
+                        <Group gap="xs">
+                          <Text size="sm" fw={500}>{ipqsUsage.phoneUsage} / {ipqsUsage.credits}</Text>
+                          {ipqsUsage.exhausted && <Badge color="red" size="sm">Exhausted</Badge>}
+                        </Group>
+                      </Group>
+                      <Tooltip label={`${ipqsUsage.phoneUsage} of ${ipqsUsage.credits} credits used`} position="bottom">
+                        <Progress
+                          value={(ipqsUsage.phoneUsage / Math.max(ipqsUsage.credits, 1)) * 100}
+                          color={ipqsUsage.exhausted || ipqsUsage.phoneUsage / ipqsUsage.credits >= 0.95 ? 'red' : 'blue'}
+                          size="sm"
+                        />
+                      </Tooltip>
+                      {ipqsUsage.exhausted && (
+                        <Alert color="orange" variant="light" p="xs">
+                          Monthly credits exhausted — IPQS lookups are paused until the 1st of next month. Existing screening rules{form.values.blockService === 'BOTH' ? ' and Nomorobo' : ''} continue to run.
+                        </Alert>
+                      )}
+                    </Stack>
+                  )}
+                  <Group>
+                    <Button
+                      variant="light"
+                      size="xs"
+                      loading={testingIpqs}
+                      onClick={handleTestIpqs}
+                      disabled={!form.values.ipqsApiKey.trim()}
+                    >
+                      Test API Key
+                    </Button>
+                    {ipqsTestResult && (
+                      <Text size="xs" c={ipqsTestResult.ok ? 'green' : 'red'}>
+                        {ipqsTestResult.message}
+                      </Text>
+                    )}
+                  </Group>
+                </Stack>
+              )}
               <Switch
                 label="Auto-block numbers that meet the spam threshold"
                 description={

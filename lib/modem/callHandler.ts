@@ -152,12 +152,20 @@ export class CallHandler {
 
     modemLog('info', `Screening result: ${screening.action} — ${screening.reason}`);
 
+    const ipqsName = isCallerIdMissing(name) ? (screening.resolvedName ?? null) : null;
     const callLogId = await insertCallLog({
-      Name: name, Number: number, Date: date, Time: time,
+      Name: ipqsName ?? name, Number: number, Date: date, Time: time,
       SystemDateTime: systemDateTime, Action: screening.action, Reason: screening.reason,
+      LineType: screening.lineType ?? null,
+      Carrier: screening.carrier ?? null,
+      City: screening.city ?? null,
+      Region: screening.region ?? null,
+      Country: screening.country ?? null,
+      FraudScore: screening.fraudScore ?? null,
+      RiskFlags: screening.riskFlags ?? null,
     });
 
-    const resolvedName = await this.resolveCallerName(name, number);
+    const resolvedName = await this.resolveCallerName(ipqsName ?? name, number);
     callEvents.emit('incoming-call', { callLogId, name: resolvedName, number, date, time, action: screening.action, reason: screening.reason });
 
     const emailSnapshot: { action: 'Permitted' | 'Blocked' | 'Screened'; name: string; number: string; date: string; time: string; systemDateTime: string; reason: string; voicemailFilename?: string } = {
@@ -453,4 +461,8 @@ export class CallHandler {
     }
     return false;
   }
+}
+
+function isCallerIdMissing(name: string): boolean {
+  return !name || /^(O|V|P|UNKNOWN|UNAVAILABLE)$/i.test(name.trim());
 }
