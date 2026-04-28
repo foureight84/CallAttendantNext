@@ -166,6 +166,7 @@ All other keys are optional and fall back to sensible defaults.
 | `SPAM_THRESHOLD` | `2` | Score threshold at which a caller is blocked. `1` = suspicious, `2` = likely spam (recommended), `3` = confirmed/high-confidence only |
 | `IPQS_API_KEY` | *(empty)* | IPQualityScore API key. Required when `BLOCK_SERVICE` is `IPQS` or `BOTH`. Preferred: set in the web UI Settings page |
 | `IPQS_STRICTNESS` | `0` | IPQS strictness level (0–3). Higher values increase fraud detection sensitivity. Only used when `BLOCK_SERVICE` is `IPQS` or `BOTH` |
+| `IPQS_COUNTRIES` | `US,CA` | Comma-separated ISO 3166-1 alpha-2 country codes for the countries where Call Attendant is running (e.g. `US,CA`). IPQS uses this to refine number lookups. Leave empty to check all countries. Only used when `BLOCK_SERVICE` is `IPQS` or `BOTH` |
 | `AUTO_BLOCK_SPAM` | `true` | Automatically add callers to the blocklist when their spam score meets the threshold |
 | `RINGS_BEFORE_VM` | `4` | Rings before answering for whitelisted callers |
 | `RINGS_BEFORE_VM_SCREENED` | `2` | Rings before answering for screened (unknown) callers |
@@ -1028,6 +1029,18 @@ The existing **Spam Threshold** slider works unchanged — the default of `2` bl
 2. Once your account is created, open **Settings & Account Management** in the left side menu, then select **API Key** from the sub-menu.
 3. Rename the existing **Start API key** if you'd like a more memorable label. Copy the API key. **Do not** set an expiration date on the key.
 4. In the Call Attendant web UI, go to **Settings → Robocall Detection**, set **Block Service** to `IPQualityScore` (or `Both`), paste your API key, and click **Save**.
+
+### Country Filter
+
+IPQS accepts a list of country codes to narrow its lookup to the countries where your Call Attendant instance is physically located. Sending the correct country improves accuracy and reduces false positives from numbers that look suspicious internationally but are normal in your region.
+
+Set this to the country (or countries) where Call Attendant is running — not where callers originate from. The default is `US,CA` (United States and Canada). You can change it in **Settings → Robocall Detection → Country Filter** or via the environment variable:
+
+```
+IPQS_COUNTRIES=US,CA
+```
+
+Leave the field empty to send no country filter, which tells IPQS to check the number globally.
 
 ### Modes
 

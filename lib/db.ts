@@ -414,6 +414,7 @@ export interface AppSettings {
   wizardCompleted: boolean;
   ipqsApiKey: string;
   ipqsStrictness: number;
+  ipqsCountries: string[];
 }
 
 export async function getSettings(): Promise<AppSettings> {
@@ -463,6 +464,7 @@ export async function getSettings(): Promise<AppSettings> {
     wizardCompleted:    (map['wizardCompleted']    ?? 'false') === 'true',
     ipqsApiKey:          map['ipqsApiKey']         ?? config.ipqsApiKey,
     ipqsStrictness:      parseInt(map['ipqsStrictness'] ?? String(config.ipqsStrictness), 10),
+    ipqsCountries:       map['ipqsCountries'] !== undefined ? map['ipqsCountries'].split(',').map(s => s.trim()).filter(Boolean) : config.ipqsCountries,
   };
 }
 
@@ -499,6 +501,7 @@ export async function seedSettingsFromEnv(): Promise<void> {
   if (e.DTMF_REMOVAL_KEY            !== undefined) seed.dtmfRemovalKey         = config.dtmfRemovalKey;
   if (e.IPQS_API_KEY                !== undefined) seed.ipqsApiKey             = config.ipqsApiKey;
   if (e.IPQS_STRICTNESS             !== undefined) seed.ipqsStrictness         = config.ipqsStrictness;
+  if (e.IPQS_COUNTRIES              !== undefined) seed.ipqsCountries          = config.ipqsCountries;
 
   if (Object.keys(seed).length > 0) await saveSettings(seed);
 }
