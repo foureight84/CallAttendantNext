@@ -117,10 +117,17 @@ export class IpqsChecker {
           phone_usage: data.phone_usage ?? 0,
           fetchedAt: Date.now(),
         };
-        if (cachedUsage.phone_usage >= cachedUsage.credits && cachedUsage.credits > 0) {
-          exhaustedMonth = currentMonthKey();
-        } else {
-          exhaustedMonth = null;
+        // Only update the exhaustion flag when the response gives us credible numbers.
+        // A credits=0 reply (API hiccup, malformed plan response) is treated as
+        // "no information" and leaves any prior exhausted state untouched —
+        // otherwise we'd silently undo a real "insufficient credits" detection
+        // from the hot path.
+        if (cachedUsage.credits > 0) {
+          if (cachedUsage.phone_usage >= cachedUsage.credits) {
+            exhaustedMonth = currentMonthKey();
+          } else {
+            exhaustedMonth = null;
+          }
         }
       }
       return data;

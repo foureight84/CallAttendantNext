@@ -1014,9 +1014,11 @@ IPQS `fraud_score` (0–100) is mapped to the same internal 0–3 scale used by 
 | Internal score | Meaning | IPQS condition |
 |---|---|---|
 | 3 | Confirmed spam | `spammer=true` OR `fraud_score ≥ 90` OR `recent_abuse=true` |
-| 2 | Likely spam | `fraud_score ≥ 75` OR `do_not_call=true` |
+| 2 | Likely spam | `fraud_score ≥ 75` |
 | 1 | Suspicious | `fraud_score ≥ 50` OR `risky=true` |
 | 0 | Clean | None of the above |
+
+> **Note:** `do_not_call` is the FCC Do Not Call registry — it indicates a number that has opted out of telemarketing, not a spam signal. Call Attendant displays this badge on the call log for context but does not factor it into the spam score.
 
 The existing **Spam Threshold** slider works unchanged — the default of `2` blocks Likely and Confirmed spam from either service.
 
@@ -1039,13 +1041,13 @@ The existing **Spam Threshold** slider works unchanged — the default of `2` bl
 
 ## Robocall Blocklist Cleanup
 
-Phone numbers flagged as robocallers don't stay with the same owner forever — numbers change hands, get recycled, and reassigned to legitimate individuals or businesses. A number that was a robocall last year may belong to a real person today. The blocklist cleanup feature periodically re-verifies entries that were added with **"Robocall"** as the reason against Nomorobo, and removes any that are no longer flagged.
+Phone numbers flagged as robocallers don't stay with the same owner forever — numbers change hands, get recycled, and reassigned to legitimate individuals or businesses. A number that was a robocall last year may belong to a real person today. The blocklist cleanup feature periodically re-verifies auto-blocked entries against Nomorobo (and optionally IPQS) and removes any that are no longer flagged.
 
 ### How it works
 
-1. Call Attendant scans the blocklist for entries whose reason contains "robocall" (case-insensitive).
-2. Each number is checked against Nomorobo with a 10-second delay between lookups to avoid rate limiting.
-3. Numbers that are no longer flagged at or above the configured spam threshold are removed from the blocklist.
+1. Call Attendant scans the blocklist for entries that were auto-added by a screening service — reasons containing "robocall" (case-insensitive) or starting with `Nomorobo:` or `IPQS:`.
+2. Each number is checked against Nomorobo with a 10-second delay between lookups to avoid rate limiting. If **Also verify with IPQS** is enabled and an IPQS API key is configured, the IPQS check runs in parallel for each entry — a number is only removed if both services agree it is no longer flagged.
+3. Numbers that score below the configured spam threshold from all enabled services are removed from the blocklist.
 4. Results are logged to the modem log so you can see exactly what was checked and removed.
 
 ### Schedule
@@ -1054,7 +1056,7 @@ The job runs on a configurable cron schedule (default: **Saturday at 2:00 AM**).
 
 You can also trigger a manual run at any time with the **Run Now** button. Because the 10-second inter-lookup delay means a large blocklist can take a while, the UI shows how many numbers remain and an estimated time to completion while the job is running. The Run Now button is disabled while a run is in progress to prevent duplicate jobs.
 
-> **Note:** Only entries added with "Robocall" as the reason are re-verified. Numbers you manually added to the blocklist (e.g. with a custom reason like "Telemarketer") are never touched.
+> **Note:** Only entries auto-added by a screening service are re-verified — reasons containing "robocall" or starting with `Nomorobo:` / `IPQS:`. Numbers you manually added to the blocklist (e.g. with a custom reason like "Telemarketer") are never touched.
 
 ### Enabling
 

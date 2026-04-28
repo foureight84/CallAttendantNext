@@ -18,6 +18,10 @@ import type { ScreeningResult } from './screener';
 const RING_INTERVAL_MS = 6000;
 const RING_TIMEOUT_BUFFER_MS = 2000;
 
+function isCallerIdMissing(name: string): boolean {
+  return !name || /^(O|V|P|UNKNOWN|UNAVAILABLE)$/i.test(name.trim());
+}
+
 export class CallHandler {
   private ringCount = 0;
   private currentCallInfo: CallerIdInfo | null = null;
@@ -461,8 +465,4 @@ export class CallHandler {
     }
     return false;
   }
-}
-
-function isCallerIdMissing(name: string): boolean {
-  return !name || /^(O|V|P|UNKNOWN|UNAVAILABLE)$/i.test(name.trim());
 }

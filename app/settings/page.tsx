@@ -489,9 +489,9 @@ export default function SettingsPage() {
               </Group>
               <Text size="sm" c="dimmed">
                 Phone numbers can change hands over time. This cleanup periodically re-checks blocklist entries
-                that were added with &quot;Robocall&quot; as the reason against Nomorobo
+                that were auto-added by a screening service (Nomorobo or IPQS) against Nomorobo
                 {form.values.robocallCleanupUseIpqs && form.values.ipqsApiKey ? ' and IPQS' : ''}. Numbers that are no longer
-                flagged are automatically removed from your blocklist.
+                flagged are automatically removed from your blocklist. Manually added entries are never touched.
               </Text>
 
               {form.values.robocallCleanupEnabled && (() => {

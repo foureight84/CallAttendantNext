@@ -505,5 +505,10 @@ export async function seedSettingsFromEnv(): Promise<void> {
 
 export async function getRobocallBlacklist(): Promise<typeof blacklist.$inferSelect[]> {
   const rows = await db.select().from(blacklist).all();
-  return rows.filter(r => r.reason?.toLowerCase().includes('robocall'));
+  return rows.filter(r => {
+    const reason = r.reason?.toLowerCase() ?? '';
+    return reason.includes('robocall')
+        || reason.startsWith('ipqs:')
+        || reason.startsWith('nomorobo:');
+  });
 }
