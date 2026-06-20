@@ -58,6 +58,7 @@ class MockModem {
   startRecording  = vi.fn().mockResolvedValue(undefined);
   stopRecording   = vi.fn().mockResolvedValue(undefined);
   isRecording     = vi.fn().mockReturnValue(false);
+  isWedged        = vi.fn().mockReturnValue(false);
   hasSustainedSilence = vi.fn().mockReturnValue(false);
   getRecordedBuffer   = vi.fn().mockReturnValue(Buffer.alloc(0));
   close           = vi.fn().mockResolvedValue(undefined);

@@ -38,6 +38,7 @@ If you have a hardware modem not on this list and would like support added, open
     - [pm2](#pm2)
     - [supervisord](#supervisord)
     - [OpenRC](#openrc)
+- [Modem Crash Recovery](#modem-crash-recovery-1)
 - [Updating](#updating)
   - [Docker Update](#docker-update)
   - [Bare Metal Update](#bare-metal-update)
@@ -204,6 +205,18 @@ All other keys are optional and fall back to sensible defaults.
 | `DEBUG_CONSOLE` | `false` | Enable the Debug Console page in the UI |
 | `DIAGNOSTIC_MODE` | `false` | Enable the Diagnostics page for running modem self-tests |
 | `SAVE_PCM_DEBUG` | `false` | Save raw PCM audio to disk during voicemail recording for debugging |
+
+### Modem Crash Recovery
+
+Some USB modems occasionally lock up mid-call (firmware hang) and stop answering AT commands entirely. A watchdog detects this and attempts automatic recovery. See [Modem Crash Recovery](#modem-crash-recovery-1) for how this works on bare metal vs. Docker.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MODEM_AUTO_RECOVER` | `true` | Master switch for automatic recovery when the modem wedges or the port drops |
+| `MODEM_WATCHDOG_TIMEOUTS` | `3` | Consecutive AT-command timeouts before the modem is declared wedged |
+| `MODEM_USB_RESET` | `true` | Attempt a dependency-free Linux sysfs USB re-enumeration during recovery (needs root or a udev rule; no-op when sysfs isn't writable) |
+| `MODEM_RESET_CMD` | _(empty)_ | Optional shell command run during recovery (e.g. a `uhubctl` power cycle or host-side reset script) |
+| `MODEM_EXIT_ON_UNRECOVERABLE` | `false` | If recovery fails, exit the process so a supervisor (systemd `Restart=always` / Docker `restart: unless-stopped`) restarts it |
 
 ### SMTP Email Notifications
 
@@ -602,6 +615,40 @@ sudo rc-service callattendant start
 > **Note:** This feature has not been tested.
 
 Set `ENABLE_GPIO=true` in `.env` to enable LED indicators on GPIO pins (requires the `onoff` package and appropriate wiring). See `lib/modem/gpio.ts` for pin assignments.
+
+---
+
+## Modem Crash Recovery
+
+Some USB modems intermittently lock up mid-call — the firmware hangs and the modem stops answering AT commands entirely (every command times out). Closing and reopening the serial port does **not** revive a hung USB-CDC modem; the USB device itself has to be re-enumerated, or physically power-cycled.
+
+The daemon includes a watchdog that detects this and runs a recovery ladder:
+
+1. **Detect** — after `MODEM_WATCHDOG_TIMEOUTS` (default 3) consecutive AT-command timeouts the modem is declared *wedged*; any in-flight call handling is aborted so it doesn't cascade into "Port not open" errors.
+2. **Soft reopen** — close, reopen, and re-initialise the serial port. This recovers transient driver/buffer wedges.
+3. **System-level reset** — if the soft reopen fails, run the optional `MODEM_RESET_CMD` and/or a Linux sysfs USB re-enumeration (`MODEM_USB_RESET`), wait for the device node to reappear, then reopen.
+4. **Escalate** — if it still can't recover and `MODEM_EXIT_ON_UNRECOVERABLE=true`, exit the process so a supervisor restarts it. Otherwise the daemon stays offline until you trigger a restart from the Debug Console.
+
+Recovery never overlaps a manual restart — both are serialized.
+
+### Bare metal (Raspberry Pi / Linux)
+
+The built-in `MODEM_USB_RESET` re-enumerates the device through sysfs (unbind/rebind, then `authorized` toggle). This needs write access to the sysfs nodes — i.e. run as root, or add a udev rule granting your service user access. If your USB hub supports per-port power control, a `uhubctl` power cycle is the most reliable option and survives true firmware hangs:
+
+```bash
+MODEM_RESET_CMD="uhubctl -a cycle -l 1-1 -p 2"
+```
+
+(Replace the location/port with your modem's — find it via `uhubctl`. If `uhubctl` needs root, allow it via a sudoers entry and set the command to `sudo uhubctl ...`.)
+
+### Docker
+
+The default `docker-compose.yml` passes through **only the tty** (`/dev/ttyUSB0`) and runs unprivileged, so an in-container USB reset is **not** possible by default. You have two choices:
+
+- **Supervisor restart (simplest):** set `MODEM_EXIT_ON_UNRECOVERABLE=true`. Combined with `restart: unless-stopped` (already in the compose file) the container restarts on an unrecoverable wedge. This clears driver/buffer wedges but **not** a true firmware hang — for that, pair it with a host-side power cycle (e.g. a host cron/watchdog running `uhubctl`).
+- **In-container reset:** grant the container the access it needs to re-enumerate the device — add `privileged: true` (or appropriate capabilities), pass through the USB bus (`/dev/bus/usb`), and mount a writable `/sys`. Then `MODEM_USB_RESET=true` (default) can work, or point `MODEM_RESET_CMD` at `uhubctl` inside the container.
+
+> **Note:** When the USB device re-enumerates, its device node can change (e.g. `ttyUSB0` → `ttyUSB1`). Recovery reopens the configured `SERIAL_PORT`; use a stable udev symlink (e.g. `/dev/serial/by-id/...`) for `SERIAL_PORT` if your setup is prone to renumbering.
 
 ---
 

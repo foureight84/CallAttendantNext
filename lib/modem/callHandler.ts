@@ -67,6 +67,12 @@ export class CallHandler {
             callEvents.emit('CALL_END');
             await this.handleCallEnd();
             break;
+          case 'WEDGED':
+            // Modem firmware hung — abort any in-flight call handling and let the
+            // daemon-level watchdog drive recovery (close/reopen/USB reset).
+            modemLog('warn', 'Modem wedged — aborting current call handling');
+            this.resetCallState();
+            break;
           case 'VOICE_DATA':
             modemLog('data', `Voice data: ${event.chunk.length} bytes`);
             break;
@@ -293,6 +299,15 @@ export class CallHandler {
       callEvents.emit('greeting-played');
     } catch (err) {
       modemLog('warn', `Could not play greeting: ${err}`);
+    }
+
+    // If the modem wedged during greeting playback, the port is dead — don't
+    // march into AT+VRX (that produced the "Port not open" cascade in the crash
+    // report). The daemon watchdog is already recovering.
+    if (this.modem.isWedged()) {
+      modemLog('warn', 'Modem wedged during greeting — skipping recording');
+      this.resetCallState();
+      return null;
     }
 
     // If the caller hung up during greeting playback, CALL_END will have fired

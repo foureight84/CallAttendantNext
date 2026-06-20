@@ -13,6 +13,7 @@ export type ModemEvent =
   | { type: 'CALLER_ID'; info: CallerIdInfo }
   | { type: 'CALL_END' }
   | { type: 'VOICE_DATA'; chunk: Buffer }
+  | { type: 'WEDGED'; consecutiveTimeouts: number }
   | { type: 'ERROR'; error: Error };
 
 // ─── Model-specific AT command variants ────────────────────────────────────
@@ -221,6 +222,14 @@ export class Modem {
   private voiceBuffer: Buffer[] = [];
   private textBuffer = '';
 
+  // ─── Watchdog / crash detection ────────────────────────────────────────────
+  // A wedged modem (firmware hang) answers no AT commands — every sendCommand
+  // times out with an empty response. We count consecutive timeouts and, once
+  // they cross the threshold, declare the modem "wedged" and emit a WEDGED event
+  // so the daemon can trigger recovery instead of marching on into a dead port.
+  private consecutiveTimeouts = 0;
+  private wedged = false;
+
   constructor() {
     this.parser.onCallerId((info) => {
       this.emit({ type: 'CALLER_ID', info });
@@ -244,6 +253,11 @@ export class Modem {
 
   async open(): Promise<void> {
     const { SerialPort } = await import('serialport');
+
+    // Clear any wedged/timeout state from a previous (failed) session so a
+    // successful reopen starts the watchdog fresh.
+    this.consecutiveTimeouts = 0;
+    this.wedged = false;
 
     this.port = new SerialPort({
       path: config.serialPort,
@@ -275,6 +289,29 @@ export class Modem {
 
   isRecording(): boolean {
     return this.inVoiceMode;
+  }
+
+  /** True once the watchdog has concluded the modem firmware is hung. */
+  isWedged(): boolean {
+    return this.wedged;
+  }
+
+  /** Record a successful AT response — clears the consecutive-timeout streak. */
+  private noteCommandSuccess(): void {
+    this.consecutiveTimeouts = 0;
+  }
+
+  /**
+   * Record an AT command timeout. Once the streak reaches the configured
+   * threshold the modem is declared wedged and a WEDGED event is emitted once.
+   */
+  private noteCommandTimeout(): void {
+    this.consecutiveTimeouts++;
+    if (!this.wedged && this.consecutiveTimeouts >= config.modemWatchdogTimeouts) {
+      this.wedged = true;
+      this.log(`[modem] Watchdog: ${this.consecutiveTimeouts} consecutive AT timeouts — modem appears wedged`);
+      this.emit({ type: 'WEDGED', consecutiveTimeouts: this.consecutiveTimeouts });
+    }
   }
 
   // ─── Data handler ─────────────────────────────────────────────────────────
@@ -365,6 +402,7 @@ export class Modem {
         this.port!.removeListener('data', onData);
         const trimmed = response.replace(/[\r\n]+/g, ' ').trim();
         this.log(`[AT] ${cmd} → TIMEOUT (got: "${trimmed}")`);
+        this.noteCommandTimeout();
         resolve(response);
       }, delayMs + 500);
 
@@ -375,6 +413,7 @@ export class Modem {
           this.port!.removeListener('data', onData);
           const trimmed = response.replace(/[\r\n]+/g, ' ').trim();
           this.log(`[AT] ${cmd} → ${trimmed}`);
+          this.noteCommandSuccess();
           resolve(response);
         }
       };
