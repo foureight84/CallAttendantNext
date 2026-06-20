@@ -28,6 +28,11 @@ export function getModem(): Modem | null {
   return globalThis.__modemInstance;
 }
 
+/** True while a recovery (soft reopen / USB reset) is in progress. */
+export function isRecovering(): boolean {
+  return globalThis.__modemRecovering != null;
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }

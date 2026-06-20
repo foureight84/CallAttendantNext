@@ -650,6 +650,41 @@ The default `docker-compose.yml` passes through **only the tty** (`/dev/ttyUSB0`
 
 > **Note:** When the USB device re-enumerates, its device node can change (e.g. `ttyUSB0` → `ttyUSB1`). Recovery reopens the configured `SERIAL_PORT`; use a stable udev symlink (e.g. `/dev/serial/by-id/...`) for `SERIAL_PORT` if your setup is prone to renumbering.
 
+### Host watchdog service (power-cycle + container restart)
+
+A true firmware hang can only be cleared by physically power-cycling the modem's USB port — which an unprivileged container can't do. The repo ships a host-side watchdog that closes this gap: it polls the app's health endpoint and, when the modem is wedged or the app is unreachable, power-cycles the USB port and restarts the container.
+
+**Health endpoint:** `GET /api/health` → `200` when the modem is connected and responsive, `503` when it's wedged or offline (JSON body: `{ ok, modemConnected, modemWedged, recovering }`). The Docker healthcheck and the watchdog both use it.
+
+**How it layers:** the in-app recovery attempts a soft reopen first; the host watchdog only escalates to a physical power cycle (after `FAIL_THRESHOLD` consecutive failures) if the app can't self-heal. Combined with `MODEM_EXIT_ON_UNRECOVERABLE=true`, this covers everything from transient driver wedges (app reopen) to full firmware hangs (host power cycle).
+
+**Requirements (host):** `bash`, `curl`, `docker`, and [`uhubctl`](https://github.com/mvp/uhubctl) for per-port USB power control. Find your modem's hub location and port with `uhubctl`.
+
+**Install:**
+
+```bash
+# From the repo (adjust ExecStart path inside the unit if not /opt/callattendant)
+sudo cp deploy/modem-watchdog.service /etc/systemd/system/
+sudo nano /etc/systemd/system/modem-watchdog.service   # set USB_RESET_CMD, CONTAINER_NAME, paths
+sudo systemctl daemon-reload
+sudo systemctl enable --now modem-watchdog
+journalctl -u modem-watchdog -f
+```
+
+Key settings (env vars in the unit / on `scripts/modem-watchdog.sh`):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `HEALTH_URL` | `http://localhost:3000/api/health` | Endpoint to poll |
+| `POLL_INTERVAL` | `15` | Seconds between checks |
+| `FAIL_THRESHOLD` | `4` | Consecutive failures before recovery (gives the app time to self-heal first) |
+| `USB_RESET_CMD` | _(empty)_ | USB power-cycle command, e.g. `uhubctl -a cycle -l 1-1 -p 2` or `usbreset 067b:2303`. Empty = container restart only |
+| `RESTART_CONTAINER` | `true` | Restart the container after the USB reset |
+| `CONTAINER_NAME` | `callattendant` | Container to restart |
+| `COOLDOWN` | `60` | Seconds to wait after a recovery action |
+
+> The watchdog runs equally well for bare-metal installs — set `RESTART_CONTAINER=false` and rely on `USB_RESET_CMD` + the systemd `Restart=always` on the app service.
+
 ---
 
 ## Updating

@@ -1,0 +1,44 @@
+# Host-side modem watchdog for Call Attendant Next.
+#
+# Installs the watchdog as a systemd service that power-cycles the USB modem and
+# restarts the container when the modem firmware hangs. Run on the HOST.
+#
+# Install:
+#   sudo cp deploy/modem-watchdog.service /etc/systemd/system/
+#   # edit the Environment= lines below for your setup, then:
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now modem-watchdog
+#   journalctl -u modem-watchdog -f
+#
+# Requirements on the host: bash, curl, docker, and (recommended) uhubctl.
+# Find your modem's hub location/port with:  uhubctl
+
+[Unit]
+Description=Call Attendant Next modem USB watchdog
+After=docker.service network-online.target
+Wants=docker.service network-online.target
+
+[Service]
+Type=simple
+
+# ── Adjust these for your install ───────────────────────────────────────────
+# Absolute path to the script (clone location):
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=HEALTH_URL=http://localhost:3000/api/health
+Environment=CONTAINER_NAME=callattendant
+Environment=POLL_INTERVAL=15
+Environment=FAIL_THRESHOLD=4
+Environment=COOLDOWN=60
+Environment=RESTART_CONTAINER=true
+# USB power-cycle command — set to your modem's hub location + port.
+# Find them with `uhubctl`. Leave empty to only restart the container.
+Environment=USB_RESET_CMD=uhubctl -a cycle -l 1-1 -p 2
+
+ExecStart=/opt/callattendant/scripts/modem-watchdog.sh
+Restart=always
+RestartSec=10
+# Needs root to run uhubctl (USB power control) and talk to the docker socket.
+User=root
+
+[Install]
+WantedBy=multi-user.target

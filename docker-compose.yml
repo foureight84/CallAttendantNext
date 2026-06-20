@@ -28,4 +28,15 @@ services:
       - ENABLE_GPIO=false
       - DEBUG_CONSOLE=false
       - NODE_ENV=production
+      # Exit on an unrecoverable modem wedge so `restart: unless-stopped` (and/or
+      # the host watchdog) restarts the container. See "Modem Crash Recovery".
+      - MODEM_EXIT_ON_UNRECOVERABLE=true
     restart: unless-stopped
+    # Reports modem health (200 = connected & responsive, 503 = wedged/offline).
+    # Used for visibility and by the host watchdog (scripts/modem-watchdog.sh).
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
