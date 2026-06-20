@@ -49,4 +49,21 @@ export const config = {
   robocallCleanupUseIpqs:  false,
   dtmfRemovalEnabled: process.env.DTMF_REMOVAL_ENABLED === 'true',
   dtmfRemovalKey:     process.env.DTMF_REMOVAL_KEY ?? '9',
+  // ─── Modem crash recovery ──────────────────────────────────────────────────
+  // Number of consecutive AT-command timeouts before the modem is declared
+  // "wedged" (firmware hang). The watchdog then triggers auto-recovery.
+  modemWatchdogTimeouts:    parseInt(process.env.MODEM_WATCHDOG_TIMEOUTS ?? '3', 10),
+  // Master switch for automatic recovery (soft reopen + optional USB reset).
+  modemAutoRecover:         process.env.MODEM_AUTO_RECOVER !== 'false',
+  // Attempt a dependency-free Linux sysfs USB re-enumeration during recovery.
+  // No-op on non-Linux and when the sysfs nodes aren't writable (e.g. inside an
+  // unprivileged Docker container).
+  modemUsbReset:            process.env.MODEM_USB_RESET !== 'false',
+  // Optional external command run during recovery (e.g. a uhubctl power cycle or
+  // a host-side reset script). Empty = disabled.
+  modemResetCmd:            process.env.MODEM_RESET_CMD ?? '',
+  // When recovery cannot revive the modem, exit the process so a supervisor
+  // (systemd Restart=always / Docker restart: unless-stopped) restarts it.
+  // Off by default; the Docker-friendly escape hatch for firmware hangs.
+  modemExitOnUnrecoverable: process.env.MODEM_EXIT_ON_UNRECOVERABLE === 'true',
 } as const;
